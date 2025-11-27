@@ -1,22 +1,18 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 
-// Import các component mới
 import BookCatalog from './Component/Books/BookCatalog';
 import BookManagement from './Component/Books/BookManagement';
 import CirculationDesk from './Component/Circulation/CirculationDesk';
-
-// Import Header/Footer cũ của bạn
-import Header from './Component/header/header'; // Chú ý đường dẫn thư mục của bạn là header thường
-// import Footer from ...
+import Header from './Component/header/header';
+import Footer from './Component/footer/footer'
 
 function App() {
   return (
     <Router>
       <div className="App">
-        <Header />
+        <Header/>
         
-        {/* Menu tạm để test chuyển trang */}
         <nav style={{ padding: 10, borderBottom: '1px solid #ccc' }}>
             <Link to="/" style={{ marginRight: 10 }}>Trang chủ</Link>
             <Link to="/search" style={{ marginRight: 10 }}>Tra cứu</Link>
@@ -32,8 +28,8 @@ function App() {
                 <Route path="/" element={<h2>Chào mừng đến với Thư viện BK</h2>} />
             </Routes>
         </div>
-        
-        {/* <Footer /> */}
+
+        <Footer/>
       </div>
     </Router>
   );

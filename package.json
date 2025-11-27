@@ -4,7 +4,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "webpack-dev-server --mode development --open --hot",
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "client": "webpack-dev-server --mode development --open --hot",
+    "server": "nodemon server.js",
     "build": "webpack --mode production"
   },
   "author": "",
@@ -15,6 +17,7 @@
     "@babel/preset-env": "^7.28.5",
     "@babel/preset-react": "^7.28.5",
     "babel-loader": "^10.0.0",
+    "concurrently": "^9.2.1",
     "css-loader": "^7.1.2",
     "html-webpack-plugin": "^5.6.4",
     "style-loader": "^4.0.0",
