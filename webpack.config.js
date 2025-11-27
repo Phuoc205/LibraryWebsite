@@ -7,6 +7,13 @@ module.exports = {
         path: path.join(__dirname, "/build"), // Thư mục chứa file được build ra
         filename: "bundle.js" // Tên file được build ra
     },
+    devServer: {
+        hot: true,
+        historyApiFallback: true,
+        client: {
+            webSocketURL: 'ws://localhost:8080/ws',
+        }
+    },
     module: {
         rules: [
         {
