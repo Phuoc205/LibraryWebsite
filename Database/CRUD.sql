@@ -301,6 +301,87 @@ INSERT INTO Fine (FineID, Amount, Reason, [Status], HandlerID, LoanID, [Closing 
 ('F005', 200000.00, N'Mất sách', 'Unpaid', 'U0000003', 'L002', NULL, NULL); -- Đã sửa: Thêm NULL cho Closing Date và ActionDate
 GO
 
+-- Sửa thuộc tính Name của Category
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[Thuoc]') AND type in (N'U'))
+DROP TABLE [Thuoc];
+
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[Category]') AND type in (N'U'))
+DROP TABLE [Category];
+GO
+
+CREATE TABLE Category (
+    Name NVARCHAR(100) PRIMARY KEY, 
+    [Description] NVARCHAR(100)   
+);
+GO
+
+CREATE TABLE Thuoc (
+    CategoryName NVARCHAR(100) NOT NULL,
+    RecordID VARCHAR(10) NOT NULL,
+    PRIMARY KEY (CategoryName, RecordID),
+    FOREIGN KEY (CategoryName) REFERENCES Category(Name),
+    FOREIGN KEY (RecordID) REFERENCES BibliographicRecord(RecordID)
+);
+GO
+
+INSERT INTO Category (Name, [Description]) VALUES 
+(N'Lập trình', N'Sách công nghệ thông tin, code'),
+(N'Kinh tế', N'Sách tài chính, quản trị kinh doanh'),
+(N'Văn học', N'Tiểu thuyết, thơ ca, tản văn'),
+(N'Khoa Học Viễn Tưởng', N'Sách về vũ trụ, tương lai'),
+(N'Truyện Trinh Thám', N'Sách điều tra phá án, Sherlock Holmes'),
+(N'Ngoại ngữ', N'Sách học tiếng Anh, Nhật, Trung');
+
+INSERT INTO Thuoc (CategoryName, RecordID) VALUES
+(N'Lập trình', 'R001'),
+(N'Lập trình', 'R004'),
+(N'Kinh tế', 'R002'),
+(N'Truyện Trinh Thám', 'R003'),
+(N'Văn học', 'R005');
+GO
+
+
+-- Sửa kiểu dữ liệu tên tác giả 
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[Viet]') AND type in (N'U'))
+DROP TABLE [Viet];
+
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[Author]') AND type in (N'U'))
+DROP TABLE [Author];
+GO
+
+CREATE TABLE Author (
+    SSN VARCHAR(10) PRIMARY KEY,      
+    Biography NVARCHAR(MAX),         
+    Fullname NVARCHAR(100)            
+);
+GO
+
+-- 4. TẠO LẠI BẢNG VIET
+CREATE TABLE Viet (
+    AuthorID VARCHAR(10) NOT NULL,
+    RecordID VARCHAR(10) NOT NULL,
+    PRIMARY KEY (AuthorID, RecordID),
+    FOREIGN KEY (AuthorID) REFERENCES Author(SSN),
+    FOREIGN KEY (RecordID) REFERENCES BibliographicRecord(RecordID)
+);
+GO
+
+INSERT INTO Author (SSN, Biography, Fullname) VALUES
+('A001', N'Tác giả nổi tiếng về lĩnh vực kinh tế, đạt nhiều giải thưởng quốc tế.', N'Nguyễn Văn A'),
+('A002', N'Nhà văn chuyên viết truyện trinh thám ly kỳ, hấp dẫn.', N'Trần Thị B'),
+('A003', N'Chuyên gia lập trình và Cơ sở dữ liệu, giảng viên đại học.', N'Lê Văn C'),
+('A004', N'Tác giả sách khoa học viễn tưởng với trí tưởng tượng phong phú.', N'Phạm Minh D'),
+('A005', N'Tác giả chuyên viết sách thiếu nhi và truyện tranh.', N'Hoàng Thúy E');
+
+INSERT INTO Viet (AuthorID, RecordID) VALUES
+('A003', 'R001'), 
+('A001', 'R002'), 
+('A002', 'R003'), 
+('A003', 'R004'), 
+('A005', 'R005'); 
+GO
+
+
 -- =============================================
 -- 3. TAO CAC TRIGGER
 -- =============================================
@@ -434,10 +515,198 @@ BEGIN
 END;
 GO
 
+-- Thủ tục 1 — sp_SearchBookByTitle
+CREATE PROCEDURE sp_SearchBookByTitle
+    @Keyword NVARCHAR(100)
+AS
+BEGIN
+    SELECT 
+        br.RecordID,
+        br.Title,
+        br.Publisher,
+        br.[Year],
+        a.Fullname AS AuthorName,
+        COUNT(CASE WHEN bc.[Status] = 'Available' THEN 1 END) AS AvailableCopies
+    FROM BibliographicRecord br
+    LEFT JOIN Viet v ON br.RecordID = v.RecordID
+    LEFT JOIN Author a ON v.AuthorID = a.SSN
+    LEFT JOIN [Book Copy] bc ON br.RecordID = bc.RecordID
+    WHERE br.Title LIKE '%' + @Keyword + '%'
+    GROUP BY 
+        br.RecordID,
+        br.Title,
+        br.Publisher,
+        br.[Year],
+        a.Fullname
+    ORDER BY br.Title ASC;
+END;
+GO
+-- Thủ tục 2 — sp_GetTopBorrowedBooks Thong ke 10 quyen sach được mượn nhiều nhất trong mot khoang thoi gian
+CREATE PROCEDURE sp_GetTopBorrowedBooks
+    @StartDate DATE,
+    @EndDate DATE
+AS
+BEGIN
+    SET NOCOUNT ON;
 
--- =============================================
--- 4. TAO CAC PROCEDURE
--- =============================================
+    SELECT TOP 10
+        br.RecordID,
+        br.Title,
+        COUNT(l.LoanID) AS BorrowCount
+    FROM Loan l
+    JOIN [Book Copy] bc ON l.BookID = bc.BookID
+    JOIN BibliographicRecord br ON bc.RecordID = br.RecordID
+    WHERE l.LoanDate BETWEEN @StartDate AND @EndDate
+    GROUP BY br.RecordID, br.Title
+    HAVING COUNT(l.LoanID) > 0
+    ORDER BY BorrowCount DESC, br.Title ASC;
+END;
+GO
+
+CREATE PROCEDURE sp_UpdateBibliographicRecord
+    @RecordID VARCHAR(10),
+    @Title NVARCHAR(200),
+    @RefBookID VARCHAR(10) = NULL,
+    @Publisher NVARCHAR(100),
+    @Year INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- 1. Kiem tra RecordID co ton tai khong
+    IF NOT EXISTS (SELECT 1 FROM BibliographicRecord WHERE RecordID = @RecordID)
+    BEGIN
+        RAISERROR(N'Lỗi: Không tìm thấy tài liệu có mã "%s" để cập nhật.', 16, 1, @RecordID);
+        RETURN;
+    END
+
+    -- 2. Kiem tra Tieu de
+    IF @Title IS NULL OR LTRIM(RTRIM(@Title)) = ''
+    BEGIN
+        RAISERROR(N'Lỗi: Tựa đề sách không được để trống khi cập nhật.', 16, 1);
+        RETURN;
+    END
+
+    -- 3. Kiem tra Nam xuat ban
+    IF @Year > (YEAR(GETDATE()) + 1)
+    BEGIN
+        RAISERROR(N'Lỗi: Năm xuất bản (%d) không hợp lệ.', 16, 1, @Year);
+        RETURN;
+    END
+
+    -- 4. Kiem tra RefBookID (khong duoc tham chieu chinh no va phai ton tai)
+    IF @RefBookID = @RecordID
+    BEGIN
+        RAISERROR(N'Lỗi: Sách không thể tự tham chiếu chính nó (RefBookID trùng RecordID).', 16, 1);
+        RETURN;
+    END
+
+    IF @RefBookID IS NOT NULL AND NOT EXISTS (SELECT 1 FROM BibliographicRecord WHERE RecordID = @RefBookID)
+    BEGIN
+        RAISERROR(N'Lỗi: Mã sách tham khảo mới "%s" không tồn tại.', 16, 1, @RefBookID);
+        RETURN;
+    END
+
+    -- 5. Thuc hien Update
+    UPDATE BibliographicRecord
+    SET Title = @Title,
+        RefBookID = @RefBookID,
+        Publisher = @Publisher,
+        [Year] = @Year
+    WHERE RecordID = @RecordID;
+
+    PRINT N'Cập nhật thông tin tài liệu thành công!';
+END;
+GO
+
+CREATE PROCEDURE sp_DeleteBibliographicRecord
+    @RecordID VARCHAR(10)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- 1. Kiem tra RecordID co ton tai khong
+    IF NOT EXISTS (SELECT 1 FROM BibliographicRecord WHERE RecordID = @RecordID)
+    BEGIN
+        RAISERROR(N'Lỗi: Không tìm thấy tài liệu có mã "%s" để xóa.', 16, 1, @RecordID);
+        RETURN;
+    END
+
+    -- 2. CHECK RANG BUOC 1: Co ban sao vat ly (Book Copy) nao khong?
+    IF EXISTS (SELECT 1 FROM [Book Copy] WHERE RecordID = @RecordID)
+    BEGIN
+        DECLARE @NumCopies INT;
+        SELECT @NumCopies = COUNT(*) FROM [Book Copy] WHERE RecordID = @RecordID;
+        
+        RAISERROR(N'Lỗi: Không thể xóa tài liệu này vì đang tồn tại %d bản sao (Book Copy) trong kho. Cần thanh lý sách trước.', 16, 1, @NumCopies);
+        RETURN;
+    END
+
+    -- 3. CHECK RANG BUOC 2: Co dang duoc sach khac tham chieu (RefBookID) khong?
+    IF EXISTS (SELECT 1 FROM BibliographicRecord WHERE RefBookID = @RecordID)
+    BEGIN
+        RAISERROR(N'Lỗi: Không thể xóa tài liệu này vì nó đang được dùng làm tài liệu tham khảo cho sách khác.', 16, 1);
+        RETURN;
+    END
+
+    -- 4. THUC HIEN XOA (Bao gom xoa cac bang phu thuoc truoc)
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        -- Xoa lien ket Tac gia (Bang Viet)
+        DELETE FROM Viet WHERE RecordID = @RecordID;
+        
+        -- Xoa lien ket The loai (Bang Thuoc)
+        DELETE FROM Thuoc WHERE RecordID = @RecordID;
+        
+        -- Xoa lien ket Tu khoa (Bang Keywords)
+        DELETE FROM Keywords WHERE RecordID = @RecordID;
+
+        -- Cuoi cung: Xoa trong bang chinh BibliographicRecord
+        DELETE FROM BibliographicRecord WHERE RecordID = @RecordID;
+
+        COMMIT TRANSACTION;
+        PRINT N'Xóa tài liệu và các thông tin liên quan thành công!';
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        DECLARE @ErrorMessage NVARCHAR(4000);
+        SET @ErrorMessage = ERROR_MESSAGE();
+        RAISERROR(N'Lỗi hệ thống khi xóa: %s', 16, 1, @ErrorMessage);
+    END CATCH
+END;
+GO
+
+CREATE OR ALTER PROCEDURE sp_FilterBooksByCategory
+    @CategoryName NVARCHAR(100)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        br.RecordID,
+        br.Title,
+        br.Publisher,
+        br.[Year],
+        a.Fullname AS AuthorName,
+        COUNT(CASE WHEN bc.[Status] = 'Available' THEN 1 END) AS AvailableCopies
+    FROM BibliographicRecord br
+    -- Join bảng Thể loại (Thuoc)
+    JOIN Thuoc t ON br.RecordID = t.RecordID
+    -- Join các bảng khác để lấy thông tin hiển thị
+    LEFT JOIN Viet v ON br.RecordID = v.RecordID
+    LEFT JOIN Author a ON v.AuthorID = a.SSN
+    LEFT JOIN [Book Copy] bc ON br.RecordID = bc.RecordID
+    WHERE 
+        t.CategoryName = @CategoryName
+    GROUP BY 
+        br.RecordID,
+        br.Title,
+        br.Publisher,
+        br.[Year],
+        a.Fullname
+    ORDER BY br.Title ASC;
+END;
+GO
 
 -- procedure insertbibliographicRecord
 CREATE PROCEDURE sp_InsertBibliographicRecord
@@ -507,90 +776,3 @@ BEGIN
     PRINT N'Thêm sách thành công!';
 END
 GO
-
--- procedure UpdatebibliographicRecord
-CREATE PROCEDURE sp_UpdateBibliographicRecord
-    @RecordID     VARCHAR(10),
-    @Title        NVARCHAR(200),
-    @RefBookID    VARCHAR(10) = NULL,
-    @Publisher    NVARCHAR(100),
-    @Year         INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    -- Không tìm thấy RecordID
-    IF NOT EXISTS (SELECT 1 FROM BibliographicRecord WHERE RecordID = @RecordID)
-    BEGIN
-        RAISERROR(N'RecordID không tồn tại, không thể cập nhật!', 16, 1);
-        RETURN;
-    END
-
-    -- Title không hợp lệ
-    IF (@Title IS NULL OR LTRIM(RTRIM(@Title)) = '')
-    BEGIN
-        RAISERROR(N'Tên sách không được để trống!', 16, 1);
-        RETURN;
-    END
-
-    -- Year không hợp lệ
-    IF (@Year < 0 OR @Year > YEAR(GETDATE()))
-    BEGIN
-        RAISERROR(N'Năm xuất bản không hợp lệ!', 16, 1);
-        RETURN;
-    END
-
-    -- RefBookID phải tồn tại nếu có
-    IF (@RefBookID IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM BibliographicRecord WHERE RecordID = @RefBookID
-    ))
-    BEGIN
-        RAISERROR(N'RefBookID không tồn tại!', 16, 1);
-        RETURN;
-    END
-
-    -- UPDATE
-    UPDATE BibliographicRecord
-    SET Title = @Title,
-        RefBookID = @RefBookID,
-        Publisher = @Publisher,
-        Year = @Year
-    WHERE RecordID = @RecordID;
-
-    PRINT N'Cập nhật sách thành công!';
-END
-GO
-
--- procedure DeletebibliographicRecord
-CREATE PROCEDURE sp_DeleteBibliographicRecord
-    @RecordID VARCHAR(10)
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    -- Kiểm tra tồn tại
-    IF NOT EXISTS (SELECT 1 FROM BibliographicRecord WHERE RecordID = @RecordID)
-    BEGIN
-        RAISERROR(N'RecordID không tồn tại, không thể xóa!', 16, 1);
-        RETURN;
-    END
-
-    -- Không được xóa nếu còn bản sao
-    IF EXISTS (SELECT 1 FROM [Book Copy] WHERE RecordID = @RecordID)
-    BEGIN
-        RAISERROR(N'Không thể xóa vì vẫn còn bản sao (Book Copy) của sách!', 16, 1);
-        RETURN;
-    END
-
-    -- Xóa liên kết Viet nếu xóa sách
-    IF EXISTS (SELECT 1 FROM Viet WHERE RecordID = @RecordID)
-    BEGIN
-        DELETE FROM Viet WHERE RecordID = @RecordID
-        RETURN;
-    END
-
-    -- DELETE
-    DELETE FROM BibliographicRecord WHERE RecordID = @RecordID;
-
-    PRINT N'Xóa sách thành công!';
-END
