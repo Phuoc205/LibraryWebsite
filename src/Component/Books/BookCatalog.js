@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 
 // --- CSS ĐÃ ĐƯỢC FIX + THÊM PHÂN TRANG ---
 const fixedStyles = `
@@ -172,86 +172,58 @@ h2 {
   transition: 0.3s;
 }
 
-/* --- TABLE --- */
-.table-container {
-  overflow-x: auto;
-  border-radius: 10px;
-  border: 1px solid #eee;
-  min-height: 300px; /* Giữ chiều cao tối thiểu để tránh giật layout khi ít sách */
-}
-.book-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 800px;
-}
-.book-table th {
-  background-color: #f8f9fa;
-  color: var(--text-light);
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 12px;
-  padding: 15px;
-  text-align: left;
-  border-bottom: 2px solid #eee;
-}
-.book-table td {
-  padding: 15px;
-  border-bottom: 1px solid #f1f1f1;
-  color: var(--text-dark);
-  font-size: 14px;
-  vertical-align: middle;
-}
-.book-table tr:hover {
-  background-color: #fcfcfc;
-}
+/* --- TABLE & SORTING --- */
+  .table-container { 
+    overflow-x: auto; 
+    border-radius: 10px; 
+    border: 1px solid #eee; 
+    position: relative; 
+    z-index: 1; 
+  }
+  .book-table { width: 100%; border-collapse: collapse; min-width: 800px; }
+  
+  .book-table th {
+    background-color: #f8f9fa; 
+    color: var(--text-light);
+    font-weight: 600; 
+    text-transform: uppercase; 
+    font-size: 12px;
+    padding: 15px; 
+    text-align: left; 
+    border-bottom: 2px solid #eee;
+    cursor: pointer; /* Cho phép click để sort */
+    user-select: none;
+    transition: background-color 0.2s;
+  }
+  .book-table th:hover { background-color: #e9ecef; color: var(--primary-color); }
 
-.status-badge {
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.status-avail {
-  background-color: rgba(46, 196, 182, 0.15);
-  color: var(--success-color);
-}
-.status-out {
-  background-color: rgba(239, 35, 60, 0.15);
-  color: var(--danger-color);
-}
+  .sort-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 5px;
+  }
 
-.actions-cell {
-  display: flex;
-  gap: 8px;
-}
-.btn-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: 0.2s;
-}
-.btn-icon-edit {
-  background: rgba(255, 159, 28, 0.15);
-  color: var(--warning-color);
-}
-.btn-icon-edit:hover {
-  background: var(--warning-color);
-  color: white;
-}
-.btn-icon-delete {
-  background: rgba(239, 35, 60, 0.15);
-  color: var(--danger-color);
-}
-.btn-icon-delete:hover {
-  background: var(--danger-color);
-  color: white;
-}
+  .sort-icon {
+    display: inline-flex;
+    flex-direction: column;
+    color: #ccc;
+  }
+  .sort-icon.active { color: var(--primary-color); }
 
+  .book-table td { padding: 15px; border-bottom: 1px solid #f1f1f1; color: var(--text-dark); font-size: 14px; vertical-align: middle; }
+  .book-table tr:hover { background-color: #fcfcfc; }
+  
+  .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .status-avail { background-color: rgba(46, 196, 182, 0.15); color: var(--success-color); }
+  .status-out { background-color: rgba(239, 35, 60, 0.15); color: var(--danger-color); }
+
+  .actions-cell { display: flex; gap: 8px; }
+  .btn-icon { width: 32px; height: 32px; border-radius: 6px; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
+  .btn-icon-edit { background: rgba(255, 159, 28, 0.15); color: var(--warning-color); }
+  .btn-icon-edit:hover { background: var(--warning-color); color: white; }
+  .btn-icon-delete { background: rgba(239, 35, 60, 0.15); color: var(--danger-color); }
+  .btn-icon-delete:hover { background: var(--danger-color); color: white; }
 /* --- PAGINATION (NEW) --- */
 .pagination-wrapper {
   display: flex;
@@ -362,19 +334,181 @@ h2 {
 
 // --- ICONS ---
 const Icons = {
-  Search: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>,
-  Filter: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>,
-  Refresh: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path></svg>,
-  Edit: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>,
-  Trash: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>,
-  Check: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>,
-  ChevronLeft: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>,
-  ChevronRight: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>,
+  Search: () => (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="11" cy="11" r="8"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+  ),
+  Filter: () => (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+    </svg>
+  ),
+  Refresh: () => (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M23 4v6h-6"></path>
+      <path d="M1 20v-6h6"></path>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path>
+      <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path>
+    </svg>
+  ),
+  Edit: () => (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+    </svg>
+  ),
+  Trash: () => (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="3 6 5 6 21 6"></polyline>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    </svg>
+  ),
+  Check: () => (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+  ),
+  SortAsc: () => (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 19V5" />
+      <path d="M5 12l7-7 7 7" />
+    </svg>
+  ),
+  // Icon mũi tên xuống
+  SortDesc: () => (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 5v14" />
+      <path d="M19 12l-7 7-7-7" />
+    </svg>
+  ),
+  // Icon mặc định (2 chiều mờ)
+  SortDefault: () => (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#ccc"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M7 15l5 5 5-5" />
+      <path d="M7 9l5-5 5 5" />
+    </svg>
+  ),
+  ChevronLeft: () => (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  ),
+  ChevronRight: () => (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  ),
 };
 
 // --- MODAL COMPONENT ---
 const EditBookModal = ({ isOpen, onClose, book, onSave }) => {
-  const [formData, setFormData] = useState({ title: "", publisher: "", year: "", refBookID: "" });
+  const [formData, setFormData] = useState({
+    title: "",
+    publisher: "",
+    year: "",
+    refBookID: "",
+  });
 
   useEffect(() => {
     if (book) {
@@ -394,28 +528,74 @@ const EditBookModal = ({ isOpen, onClose, book, onSave }) => {
       <div className="modal-card">
         <div className="modal-header">
           <h3>Sửa thông tin sách</h3>
-          <button onClick={onClose} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "20px" }}>✕</button>
+          <button
+            onClick={onClose}
+            style={{
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              fontSize: "20px",
+            }}
+          >
+            ✕
+          </button>
         </div>
-        <form onSubmit={(e) => { e.preventDefault(); onSave(book.RecordID, formData); }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSave(book.RecordID, formData);
+          }}
+        >
           <div className="form-group">
             <label>Tựa đề sách (*)</label>
-            <input type="text" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required />
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
+              required
+            />
           </div>
           <div className="form-group">
             <label>Nhà xuất bản</label>
-            <input type="text" value={formData.publisher} onChange={(e) => setFormData({ ...formData, publisher: e.target.value })} />
+            <input
+              type="text"
+              value={formData.publisher}
+              onChange={(e) =>
+                setFormData({ ...formData, publisher: e.target.value })
+              }
+            />
           </div>
           <div className="form-group">
             <label>Năm xuất bản (*)</label>
-            <input type="number" value={formData.year} onChange={(e) => setFormData({ ...formData, year: e.target.value })} required />
+            <input
+              type="number"
+              value={formData.year}
+              onChange={(e) =>
+                setFormData({ ...formData, year: e.target.value })
+              }
+              required
+            />
           </div>
           <div className="form-group">
             <label>Mã sách tham khảo (RefID)</label>
-            <input type="text" value={formData.refBookID} onChange={(e) => setFormData({ ...formData, refBookID: e.target.value })} placeholder="VD: R001" />
+            <input
+              type="text"
+              value={formData.refBookID}
+              onChange={(e) =>
+                setFormData({ ...formData, refBookID: e.target.value })
+              }
+              placeholder="VD: R001"
+            />
           </div>
           <div className="modal-footer">
-            <button type="button" className="btn-cancel" onClick={onClose}>Hủy bỏ</button>
-            <button type="submit" className="btn-save">Lưu thay đổi</button>
+            <button type="button" className="btn-cancel" onClick={onClose}>
+              Hủy bỏ
+            </button>
+            <button type="submit" className="btn-save">
+              Lưu thay đổi
+            </button>
           </div>
         </form>
       </div>
@@ -437,6 +617,12 @@ const BookCatalog = () => {
   // State Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentBook, setCurrentBook] = useState(null);
+
+  // --- STATE SORT ---
+  const [sortConfig, setSortConfig] = useState({
+    key: null,
+    direction: "ascending",
+  });
 
   // --- STATE PHÂN TRANG (MỚI) ---
   const [currentPage, setCurrentPage] = useState(1);
@@ -470,7 +656,9 @@ const BookCatalog = () => {
   // --- API CALLS ---
   const fetchBooks = async (searchKey) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/books/search?keyword=${searchKey}`);
+      const response = await fetch(
+        `http://localhost:5000/api/books/search?keyword=${searchKey}`
+      );
       if (!response.ok) throw new Error("Lỗi kết nối");
       const data = await response.json();
       setBooks(data);
@@ -492,7 +680,9 @@ const BookCatalog = () => {
     setKeyword("");
 
     try {
-      const url = `http://localhost:5000/api/books/filter-by-category?category=${encodeURIComponent(categoryName)}`;
+      const url = `http://localhost:5000/api/books/filter-by-category?category=${encodeURIComponent(
+        categoryName
+      )}`;
       const res = await fetch(url);
       const data = await res.json();
       setBooks(data);
@@ -509,6 +699,64 @@ const BookCatalog = () => {
     setIsFilterOpen(false);
   };
 
+  const requestSort = (key) => {
+    let direction = "ascending";
+    if (sortConfig.key === key && sortConfig.direction === "ascending") {
+      direction = "descending";
+    }
+    setSortConfig({ key, direction });
+    setCurrentPage(1);
+  };
+
+  // Tính toán danh sách đã sắp xếp
+  const sortedBooks = useMemo(() => {
+    // Tạo bản sao để sort
+    let sortableItems = [...books];
+    if (sortConfig.key !== null) {
+      sortableItems.sort((a, b) => {
+        let aValue = a[sortConfig.key];
+        let bValue = b[sortConfig.key];
+
+        if (sortConfig.key === "AvailableCopies") {
+          aValue = Number(aValue);
+          bValue = Number(bValue);
+        } else {
+          if (aValue === null) aValue = "";
+          if (bValue === null) bValue = "";
+          aValue = aValue.toString().toLowerCase();
+          bValue = bValue.toString().toLowerCase();
+        }
+
+        if (aValue < bValue)
+          return sortConfig.direction === "ascending" ? -1 : 1;
+        if (aValue > bValue)
+          return sortConfig.direction === "ascending" ? 1 : -1;
+        return 0;
+      });
+    }
+    return sortableItems; // Danh sách đã được sắp xếp (Full list)
+  }, [books, sortConfig]);
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentBooks = sortedBooks.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(sortedBooks.length / itemsPerPage);
+
+  const handlePageChange = (pageNumber) => setCurrentPage(pageNumber);
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  // Hàm render icon sort
+  const getSortIcon = (name) => {
+    if (sortConfig.key !== name) return <Icons.SortDefault />;
+    if (sortConfig.direction === "ascending") return <Icons.SortAsc />;
+    return <Icons.SortDesc />;
+  };
+
   // --- CRUD HANDLERS ---
   const handleEditClick = (book) => {
     setCurrentBook(book);
@@ -517,15 +765,18 @@ const BookCatalog = () => {
 
   const handleSaveUpdate = async (recordID, updatedData) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/books/${recordID}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedData),
-      });
+      const response = await fetch(
+        `http://localhost:5000/api/books/${recordID}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedData),
+        }
+      );
       if (!response.ok) throw new Error(await response.text());
       alert("Cập nhật thành công!");
       setIsModalOpen(false);
-      
+
       // Refresh dữ liệu
       if (currentFilter) handleFilterByCategory(currentFilter);
       else fetchBooks(keyword);
@@ -537,7 +788,9 @@ const BookCatalog = () => {
   const handleDelete = async (id) => {
     if (window.confirm(`Bạn có chắc muốn xóa sách ${id}?`)) {
       try {
-        const response = await fetch(`http://localhost:5000/api/books/${id}`, { method: "DELETE" });
+        const response = await fetch(`http://localhost:5000/api/books/${id}`, {
+          method: "DELETE",
+        });
         if (!response.ok) throw new Error(await response.text());
         alert("Đã xóa thành công!");
         if (currentFilter) handleFilterByCategory(currentFilter);
@@ -546,24 +799,6 @@ const BookCatalog = () => {
         alert("Không thể xóa: " + err.message);
       }
     }
-  };
-
-  // --- LOGIC PHÂN TRANG (MỚI) ---
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentBooks = books.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(books.length / itemsPerPage);
-
-  const handlePageChange = (pageNumber) => {
-    setCurrentPage(pageNumber);
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-  };
-
-  const handlePrevPage = () => {
-    if (currentPage > 1) setCurrentPage(currentPage - 1);
   };
 
   return (
@@ -585,7 +820,9 @@ const BookCatalog = () => {
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             />
           </div>
-          <button className="btn-search" onClick={handleSearch}>Tìm kiếm</button>
+          <button className="btn-search" onClick={handleSearch}>
+            Tìm kiếm
+          </button>
 
           {/* 2. FILTER DROPDOWN */}
           <div className="filter-wrapper" ref={filterRef}>
@@ -596,13 +833,23 @@ const BookCatalog = () => {
                 setIsFilterOpen(!isFilterOpen);
               }}
             >
-              <span style={{ pointerEvents: "none", display: "flex" }}><Icons.Filter /></span>
+              <span style={{ pointerEvents: "none", display: "flex" }}>
+                <Icons.Filter />
+              </span>
               {currentFilter ? currentFilter : "Lọc Thể Loại"}
             </button>
 
             {isFilterOpen && (
               <div className="dropdown-menu">
-                <div style={{ padding: "8px 12px", fontSize: "12px", fontWeight: "700", color: "#8d99ae", textTransform: "uppercase" }}>
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    fontSize: "12px",
+                    fontWeight: "700",
+                    color: "#8d99ae",
+                    textTransform: "uppercase",
+                  }}
+                >
                   Chọn thể loại
                 </div>
                 <div className="dropdown-item" onClick={handleReset}>
@@ -612,7 +859,9 @@ const BookCatalog = () => {
                 {categories.map((cat, idx) => (
                   <div
                     key={idx}
-                    className={`dropdown-item ${currentFilter === cat.Name ? "selected" : ""}`}
+                    className={`dropdown-item ${
+                      currentFilter === cat.Name ? "selected" : ""
+                    }`}
                     onClick={() => handleFilterByCategory(cat.Name)}
                   >
                     <span>{cat.Name}</span>
@@ -624,7 +873,11 @@ const BookCatalog = () => {
           </div>
 
           {/* 3. RESET BUTTON */}
-          <button className="btn-reset" onClick={handleReset} title="Làm mới dữ liệu">
+          <button
+            className="btn-reset"
+            onClick={handleReset}
+            title="Làm mới dữ liệu"
+          >
             <Icons.Refresh />
           </button>
         </div>
@@ -634,17 +887,38 @@ const BookCatalog = () => {
           <table className="book-table">
             <thead>
               <tr>
-                <th>Mã TB</th>
-                <th>Thông tin Sách</th>
-                <th>Tác giả / NXB</th>
-                <th>Trạng thái</th>
+                <th onClick={() => requestSort("RecordID")}>
+                  <div class="sort-header">Mã TB {getSortIcon("RecordID")}</div>
+                </th>
+                <th onClick={() => requestSort("Title")}>
+                  <div class="sort-header">
+                    Thông tin Sách {getSortIcon("Title")}
+                  </div>
+                </th>
+                <th onClick={() => requestSort("AuthorName")}>
+                  <div class="sort-header">
+                    Tác giả / NXB {getSortIcon("AuthorName")}
+                  </div>
+                </th>
+                <th onClick={() => requestSort("AvailableCopies")}>
+                  <div class="sort-header">
+                    Trạng thái {getSortIcon("AvailableCopies")}
+                  </div>
+                </th>
                 <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
-              {books.length === 0 ? (
+              {currentBooks.length === 0 ? (
                 <tr>
-                  <td colSpan="5" style={{ textAlign: "center", padding: "40px", color: "#999" }}>
+                  <td
+                    colSpan="5"
+                    style={{
+                      textAlign: "center",
+                      padding: "40px",
+                      color: "#999",
+                    }}
+                  >
                     Không tìm thấy dữ liệu.
                   </td>
                 </tr>
@@ -654,22 +928,48 @@ const BookCatalog = () => {
                   <tr key={book.RecordID}>
                     <td style={{ fontWeight: "bold" }}>{book.RecordID}</td>
                     <td>
-                      <div style={{ fontWeight: "600", color: "#2b2d42" }}>{book.Title}</div>
-                      <div style={{ fontSize: "12px", color: "#8d99ae" }}>Năm: {book.Year}</div>
+                      <div style={{ fontWeight: "600", color: "#2b2d42" }}>
+                        {book.Title}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#8d99ae" }}>
+                        Năm: {book.Year}
+                      </div>
                     </td>
                     <td>
                       <div>{book.AuthorName || "---"}</div>
-                      <div style={{ fontSize: "13px", color: "#8d99ae" }}>{book.Publisher}</div>
+                      <div style={{ fontSize: "13px", color: "#8d99ae" }}>
+                        {book.Publisher}
+                      </div>
                     </td>
                     <td>
-                      <span className={`status-badge ${book.AvailableCopies > 0 ? "status-avail" : "status-out"}`}>
-                        {book.AvailableCopies > 0 ? `Sẵn có: ${book.AvailableCopies}` : "Đã hết"}
+                      <span
+                        className={`status-badge ${
+                          book.AvailableCopies > 0
+                            ? "status-avail"
+                            : "status-out"
+                        }`}
+                      >
+                        {book.AvailableCopies > 0
+                          ? `Sẵn có: ${book.AvailableCopies}`
+                          : "Đã hết"}
                       </span>
                     </td>
                     <td>
                       <div className="actions-cell">
-                        <button className="btn-icon btn-icon-edit" onClick={() => handleEditClick(book)} title="Sửa"><Icons.Edit /></button>
-                        <button className="btn-icon btn-icon-delete" onClick={() => handleDelete(book.RecordID)} title="Xóa"><Icons.Trash /></button>
+                        <button
+                          className="btn-icon btn-icon-edit"
+                          onClick={() => handleEditClick(book)}
+                          title="Sửa"
+                        >
+                          <Icons.Edit />
+                        </button>
+                        <button
+                          className="btn-icon btn-icon-delete"
+                          onClick={() => handleDelete(book.RecordID)}
+                          title="Xóa"
+                        >
+                          <Icons.Trash />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -680,17 +980,17 @@ const BookCatalog = () => {
         </div>
 
         {/* --- PAGINATION CONTROLS (MỚI) --- */}
-        {books.length > 0 && (
+        {sortedBooks.length > 0 && (
           <div className="pagination-wrapper">
-            <button 
-              className="btn-page" 
-              onClick={handlePrevPage} 
+            <button
+              className="btn-page"
+              onClick={handlePrevPage}
               disabled={currentPage === 1}
               title="Trang trước"
             >
               <Icons.ChevronLeft />
             </button>
-            
+
             {/* Tạo mảng số trang để render */}
             {Array.from({ length: totalPages }, (_, i) => (
               <button
@@ -702,9 +1002,9 @@ const BookCatalog = () => {
               </button>
             ))}
 
-            <button 
-              className="btn-page" 
-              onClick={handleNextPage} 
+            <button
+              className="btn-page"
+              onClick={handleNextPage}
               disabled={currentPage === totalPages}
               title="Trang sau"
             >
@@ -713,7 +1013,12 @@ const BookCatalog = () => {
           </div>
         )}
 
-        <EditBookModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} book={currentBook} onSave={handleSaveUpdate} />
+        <EditBookModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          book={currentBook}
+          onSave={handleSaveUpdate}
+        />
       </div>
     </>
   );
