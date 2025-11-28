@@ -24,7 +24,7 @@ const Header = () => {
                 <div className="dropdown">
                     <span className="dropdown-title">Thủ thư ▼</span>
                     <div className="dropdown-menu">
-                        <Link to="/manage">Quản lý sách (Nhập liệu)</Link>
+                        <Link to="/manage-books">Quản lý sách (Nhập liệu)</Link>
                         <Link to="/return">Quầy trả sách (Lưu hành)</Link>
                     </div>
                 </div>
