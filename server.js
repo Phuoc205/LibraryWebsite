@@ -6,14 +6,26 @@ const app = express();
 const PORT = 5000;
 
 // 1. Cấu hình kết nối SQL Server
+// const dbConfig = {
+//   user: "sa",
+//   password: "12345",
+//   server: "localhost", // SỬA: Phải là localhost hoặc 127.0.0.1
+//   database: "LibraryDB",
+//   options: {
+//     encrypt: true,
+//     trustServerCertificate: true,
+//   },
+// };
 const dbConfig = {
   user: "sa",
-  password: "12345",
+  password: "123456",
   server: "localhost", // SỬA: Phải là localhost hoặc 127.0.0.1
+  //    port: 63218,         // THÊM: Điền port từ ảnh TCP/IP Properties vào đây
   database: "LibraryDB",
   options: {
     encrypt: true,
     trustServerCertificate: true,
+    instanceName: "SQLEXPRESS", // Bạn có thể bỏ dòng này vì đã khai báo port cụ thể
   },
 };
 
