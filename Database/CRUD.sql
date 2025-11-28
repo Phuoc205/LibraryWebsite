@@ -433,3 +433,164 @@ BEGIN
     END
 END;
 GO
+
+
+-- =============================================
+-- 4. TAO CAC PROCEDURE
+-- =============================================
+
+-- procedure insertbibliographicRecord
+CREATE PROCEDURE sp_InsertBibliographicRecord
+    @Title        NVARCHAR(200),
+    @RefBookID    VARCHAR(10) = NULL,
+    @Publisher    NVARCHAR(100),
+    @Year         INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- 1. KHAI BÁO BIẾN
+    DECLARE @NextID VARCHAR(10);
+    DECLARE @MaxID VARCHAR(10);
+    DECLARE @NumPart INT;
+
+    -- 2. VALIDATE DỮ LIỆU ĐẦU VÀO (Như yêu cầu đề bài)
+    -- Validate 1: Năm xuất bản hợp lệ
+    IF (@Year < 0 OR @Year > YEAR(GETDATE()))
+    BEGIN
+        RAISERROR(N'Năm xuất bản không hợp lệ!', 16, 1);
+        RETURN;
+    END
+    -- Validate 2: Tựa đề sách không được trống
+    IF LEN(TRIM(@Title)) = 0
+    BEGIN
+        RAISERROR(N'Lỗi: Tựa đề sách không được để trống!', 16, 1);
+        RETURN;
+    END
+    -- Validate 3: Kiểm tra RefBookID có tồn tại (nếu được cung cấp)
+    IF (@RefBookID IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM BibliographicRecord WHERE RecordID = @RefBookID
+    ))
+    BEGIN
+        RAISERROR(N'RefBookID không tồn tại!', 16, 1);
+        RETURN;
+    END
+
+    -- 3. LOGIC TỰ ĐỘNG SINH MÃ (AUTO GENERATE ID)
+    -- Lấy ID lớn nhất hiện tại (Sắp xếp theo độ dài rồi đến giá trị để tránh lỗi R10 < R9)
+    SELECT TOP 1 @MaxID = RecordID 
+    FROM BibliographicRecord 
+    ORDER BY LEN(RecordID) DESC, RecordID DESC;
+
+    IF @MaxID IS NULL
+    BEGIN
+        SET @NextID = 'R001';
+    END
+    ELSE
+    BEGIN
+        SET @NumPart = CAST(SUBSTRING(@MaxID, 2, LEN(@MaxID)) AS INT) + 1;
+        SET @NextID = 'R' + FORMAT(@NumPart, 'D4');
+    END
+
+    -- 4. THỰC HIỆN INSERT
+    BEGIN TRY
+        INSERT INTO BibliographicRecord(RecordID, Title, RefBookID, Publisher, [Year])
+        VALUES (@NextID, @Title, @RefBookID, @Publisher, @Year);
+
+        SELECT @NextID AS NewRecordID;
+    END TRY
+    BEGIN CATCH
+        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+        RAISERROR(@ErrorMessage, 16, 1);
+    END CATCH
+
+    PRINT N'Thêm sách thành công!';
+END
+GO
+
+-- procedure UpdatebibliographicRecord
+CREATE PROCEDURE sp_UpdateBibliographicRecord
+    @RecordID     VARCHAR(10),
+    @Title        NVARCHAR(200),
+    @RefBookID    VARCHAR(10) = NULL,
+    @Publisher    NVARCHAR(100),
+    @Year         INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Không tìm thấy RecordID
+    IF NOT EXISTS (SELECT 1 FROM BibliographicRecord WHERE RecordID = @RecordID)
+    BEGIN
+        RAISERROR(N'RecordID không tồn tại, không thể cập nhật!', 16, 1);
+        RETURN;
+    END
+
+    -- Title không hợp lệ
+    IF (@Title IS NULL OR LTRIM(RTRIM(@Title)) = '')
+    BEGIN
+        RAISERROR(N'Tên sách không được để trống!', 16, 1);
+        RETURN;
+    END
+
+    -- Year không hợp lệ
+    IF (@Year < 0 OR @Year > YEAR(GETDATE()))
+    BEGIN
+        RAISERROR(N'Năm xuất bản không hợp lệ!', 16, 1);
+        RETURN;
+    END
+
+    -- RefBookID phải tồn tại nếu có
+    IF (@RefBookID IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM BibliographicRecord WHERE RecordID = @RefBookID
+    ))
+    BEGIN
+        RAISERROR(N'RefBookID không tồn tại!', 16, 1);
+        RETURN;
+    END
+
+    -- UPDATE
+    UPDATE BibliographicRecord
+    SET Title = @Title,
+        RefBookID = @RefBookID,
+        Publisher = @Publisher,
+        Year = @Year
+    WHERE RecordID = @RecordID;
+
+    PRINT N'Cập nhật sách thành công!';
+END
+GO
+
+-- procedure DeletebibliographicRecord
+CREATE PROCEDURE sp_DeleteBibliographicRecord
+    @RecordID VARCHAR(10)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Kiểm tra tồn tại
+    IF NOT EXISTS (SELECT 1 FROM BibliographicRecord WHERE RecordID = @RecordID)
+    BEGIN
+        RAISERROR(N'RecordID không tồn tại, không thể xóa!', 16, 1);
+        RETURN;
+    END
+
+    -- Không được xóa nếu còn bản sao
+    IF EXISTS (SELECT 1 FROM [Book Copy] WHERE RecordID = @RecordID)
+    BEGIN
+        RAISERROR(N'Không thể xóa vì vẫn còn bản sao (Book Copy) của sách!', 16, 1);
+        RETURN;
+    END
+
+    -- Xóa liên kết Viet nếu xóa sách
+    IF EXISTS (SELECT 1 FROM Viet WHERE RecordID = @RecordID)
+    BEGIN
+        DELETE FROM Viet WHERE RecordID = @RecordID
+        RETURN;
+    END
+
+    -- DELETE
+    DELETE FROM BibliographicRecord WHERE RecordID = @RecordID;
+
+    PRINT N'Xóa sách thành công!';
+END
