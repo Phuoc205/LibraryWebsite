@@ -20,6 +20,7 @@
   background-color: var(--white);
   border-radius: 16px;
   box-shadow: var(--shadow);
+  overflow: visible !important;
 }
 
 h2 {
@@ -41,6 +42,7 @@ h2 {
   padding: 15px;
   border-radius: 12px;
   flex-wrap: wrap;
+  overflow: visible !important;
 }
 
 .search-wrapper {
@@ -121,6 +123,8 @@ h2 {
   padding: 8px;
   border: 1px solid #eee;
   animation: slideDown 0.2s ease-out;
+  z-index: 99999 !important;
+  display: block; /* Ép hiển thị dạng khối */
 }
 @keyframes slideDown {
   from {
