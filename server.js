@@ -119,6 +119,82 @@ app.post("/api/loans/return", async (req, res) => {
   }
 });
 
+// API: Sửa thông tin sách (SET)
+app.put("/api/books/:id", async (req, res) => {
+  try {
+    const { id } = req.params; // Lấy RecordID từ URL (ví dụ: /api/books/R001)
+    const { title, publisher, year, refBookID } = req.body; // Lấy dữ liệu cần sửa từ Body
+
+    const pool = await sql.connect(dbConfig);
+
+    await pool
+      .request()
+      .input("RecordID", sql.VarChar, id) // Map với @RecordID
+      .input("Title", sql.NVarChar, title) // Map với @Title
+      .input("Publisher", sql.NVarChar, publisher) // Map với @Publisher
+      .input("Year", sql.Int, year) // Map với @Year
+      // Xử lý RefBookID: nếu gửi lên chuỗi rỗng hoặc undefined thì chuyển thành NULL
+      .input("RefBookID", sql.VarChar, refBookID ? refBookID : null)
+      .execute("sp_UpdateBibliographicRecord");
+
+    res.json({ message: "Cập nhật sách thành công!" });
+  } catch (err) {
+    // Nếu SP bắn lỗi (RAISERROR) như: sai năm, sai mã tham khảo... nó sẽ vào đây
+    console.error("Lỗi khi cập nhật:", err.message);
+    res.status(500).send(err.message);
+  }
+});
+// API: XÓA thông tin sách (DELETE)
+app.delete("/api/books/:id", async (req, res) => {
+  try {
+    const { id } = req.params; // Lấy ID từ URL (ví dụ: /api/books/R001)
+    const pool = await sql.connect(dbConfig);
+
+    // Gọi Stored Procedure sp_DeleteBibliographicRecord
+    // SP này đã bao gồm logic kiểm tra ràng buộc (Book Copy, RefBook)
+    // và tự động xóa dữ liệu liên quan (Viet, Thuoc, Keywords)
+    await pool
+      .request()
+      .input("RecordID", sql.VarChar, id)
+      .execute("sp_DeleteBibliographicRecord");
+
+    res.json({ message: "Xóa sách thành công" });
+  } catch (err) {
+    // Nếu SP bắn lỗi RAISERROR (ví dụ: còn sách trong kho), nó sẽ nhảy vào đây
+    console.error("Lỗi khi xóa:", err.message);
+    res.status(500).send(err.message);
+  }
+});
+
+// API 6: Lọc sách theo thể loại (Gọi SP riêng)
+app.get("/api/books/filter-by-category", async (req, res) => {
+  try {
+    const { category } = req.query;
+    const pool = await sql.connect(dbConfig);
+
+    const result = await pool
+      .request()
+      .input("CategoryName", sql.NVarChar(100), category)
+      .execute("sp_FilterBooksByCategory");
+
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("Lỗi lọc sách:", err);
+    res.status(500).send(err.message);
+  }
+});
+
+app.get("/api/categories", async (req, res) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const result = await pool.request().query("SELECT Name FROM Category");
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("Lỗi lấy danh mục:", err);
+    res.status(500).send(err.message);
+  }
+});
+
 // Khởi chạy server
 app.listen(PORT, () => {
   console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);
