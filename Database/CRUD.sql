@@ -226,7 +226,8 @@ INSERT INTO BibliographicRecord (RecordID, Title, RefBookID, Publisher, [Year]) 
 ('R010', N'Clean Architecture: Kiến trúc sạch', NULL, N'Nhà xuất bản Khoa học Kỹ thuật', 2021),
 ('R011', N'Rừng Na Uy', NULL, N'Nhà xuất bản Hội Nhà Văn', 2015),
 ('R012', N'Nhập môn Trí tuệ nhân tạo & C#', NULL, N'Nhà xuất bản Đại học Quốc gia', 2025),
-('R013', N'Lập trình C# cơ bản (Tái bản lần 2)', 'R001', N'Nhà xuất bản Trẻ', 2025);
+('R013', N'Tiếng Anh giao tiếp cơ bản', NULL, N'Nhà xuất bản Giáo dục Việt Nam', 2020);
+
 
 -- 2.5 User Data
 INSERT INTO [User] (UserID, Username, [Password], [First Name], [Last Name], Email, SSN, Birthday, [Address], UserType, [Phone Number]) VALUES
