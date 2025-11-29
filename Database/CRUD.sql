@@ -651,3 +651,135 @@ BEGIN
     ORDER BY br.Title ASC;
 END;
 GO
+-- 2.4.1 Ham 1: Tinh toan tien phat (Su dung IF/tinh toan)
+-- Muc dich: Tinh tien phat du kien dua tren so ngay qua han trong bang Loan
+IF OBJECT_ID('fn_CalculateFine') IS NOT NULL
+    DROP FUNCTION fn_CalculateFine;
+GO
+
+CREATE FUNCTION fn_CalculateFine (@LoanID VARCHAR(8))
+RETURNS DECIMAL(10,2)
+AS
+BEGIN
+    DECLARE @FineAmount DECIMAL(10,2) = 0;
+    DECLARE @DueDate DATE;
+    DECLARE @ReturnDate DATE;
+    DECLARE @DaysOverdue INT;
+    DECLARE @DailyFineRate DECIMAL(10,2) = 5000; -- Muc phat: 5000 dong/ngay
+
+    -- Kiem tra xem LoanID co ton tai khong
+    IF NOT EXISTS (SELECT 1 FROM Loan WHERE LoanID = @LoanID)
+        RETURN 0;
+
+    -- Nếu tất cả phiếu phạt liên quan đã Paid thì không còn phạt
+    IF NOT EXISTS (SELECT 1 FROM Fine WHERE LoanID = @LoanID AND [Status] = 'Unpaid')
+        RETURN 0;
+
+    -- Lay thong tin Han Tra va Ngay Tra tu bang Loan
+    SELECT @DueDate = [Due Date], @ReturnDate = ReturnDate
+    FROM Loan
+    WHERE LoanID = @LoanID;
+
+    -- Neu chua tra sach (ReturnDate la NULL), tinh den hom nay
+    IF @ReturnDate IS NULL
+        SET @ReturnDate = CAST(GETDATE() AS DATE);
+
+    -- Logic IF: Chi phat neu Ngay tra thuc te > Han tra
+    IF @ReturnDate > @DueDate
+    BEGIN
+        SET @DaysOverdue = DATEDIFF(DAY, @DueDate, @ReturnDate);
+        SET @FineAmount = @DaysOverdue * @DailyFineRate;
+    END
+
+    RETURN @FineAmount;
+END;
+GO
+
+-- 2.4.2 Ham 2: Liet ke sach qua han (Su dung CURSOR)
+-- Muc dich: Tra ve chuoi ten cac cuon sach dang bi qua han cua 1 User
+IF OBJECT_ID('fn_ListOverdueBooksByUser') IS NOT NULL
+    DROP FUNCTION fn_ListOverdueBooksByUser;
+GO
+
+CREATE FUNCTION fn_ListOverdueBooksByUser (@UserID CHAR(8))
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    DECLARE @BookList NVARCHAR(MAX) = '';
+    DECLARE @Title NVARCHAR(200);
+
+    -- Kiem tra User ton tai
+    IF NOT EXISTS (SELECT 1 FROM [User] WHERE UserID = @UserID)
+        RETURN N'User không tồn tại';
+
+    -- Khai bao CURSOR de duyet danh sach sach qua han
+    -- Join cac bang: Loan -> Book Copy -> BibliographicRecord de lay Title
+    DECLARE cur_Overdue CURSOR FOR
+    SELECT br.Title
+    FROM Loan l
+    JOIN [Book Copy] bc ON l.BookID = bc.BookID
+    JOIN BibliographicRecord br ON bc.RecordID = br.RecordID
+    WHERE l.BorrowerID = @UserID 
+      AND l.[Status] = 'Overdue'; -- Chi lay sach co trang thai Overdue
+
+    OPEN cur_Overdue;
+    FETCH NEXT FROM cur_Overdue INTO @Title;
+
+    -- Vong lap duyet tung dong
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        -- Noi chuoi: Neu da co sach truoc do thi them dau phay
+        IF @BookList = ''
+            SET @BookList = @Title;
+        ELSE
+            SET @BookList = @BookList + ', ' + @Title;
+
+        FETCH NEXT FROM cur_Overdue INTO @Title;
+    END;
+
+    CLOSE cur_Overdue;
+    DEALLOCATE cur_Overdue;
+
+    IF @BookList = ''
+        SET @BookList = N'Không có sách quá hạn.';
+
+    RETURN @BookList;
+END;
+GO
+-- =============================================
+-- Muc dich: Xu ly giao dich Tra sach va Thu tien phat cung luc (Transaction)
+-- =============================================
+GO
+
+CREATE OR ALTER PROCEDURE sp_ReturnBookAndPayFine
+    @LoanID VARCHAR(8)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        -- A. Cập nhật trạng thái Phiếu mượn thành Returned
+        UPDATE Loan 
+        SET ReturnDate = GETDATE(), [Status] = 'Returned'
+        WHERE LoanID = @LoanID;
+
+        -- B. Cập nhật Phiếu phạt thành Paid (Nếu có nợ)
+        -- Điều này đảm bảo khi tính lại tiền phạt sẽ ra 0
+        IF EXISTS (SELECT 1 FROM Fine WHERE LoanID = @LoanID AND [Status] = 'Unpaid')
+        BEGIN
+            UPDATE Fine
+            SET [Status] = 'Paid', 
+                [Closing Date] = GETDATE(),
+                ActionDate = GETDATE()
+            WHERE LoanID = @LoanID AND [Status] = 'Unpaid';
+        END
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+        RAISERROR(@ErrorMessage, 16, 1);
+    END CATCH
+END;
+GO
