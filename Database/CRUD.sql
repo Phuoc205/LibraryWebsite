@@ -766,6 +766,7 @@ CREATE OR ALTER PROCEDURE sp_ReturnBookAndPayFine
 AS
 BEGIN
     SET NOCOUNT ON;
+    DECLARE @CalculatedFine DECIMAL(10,2) = dbo.fn_CalculateFine(@LoanID);
     BEGIN TRANSACTION;
     BEGIN TRY
         -- A. Cập nhật trạng thái Phiếu mượn thành Returned
@@ -780,6 +781,7 @@ BEGIN
             UPDATE Fine
             SET [Status] = 'Paid', 
                 [Closing Date] = GETDATE(),
+                Amount = @CalculatedFine,
                 ActionDate = GETDATE()
             WHERE LoanID = @LoanID AND [Status] = 'Unpaid';
         END

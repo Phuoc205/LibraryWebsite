@@ -110,22 +110,69 @@ app.post("/api/books", async (req, res) => {
 
 // API 3: Kiểm tra tiền phạt (Gọi Function SQL)
 app.get("/api/loans/fine/:loanID", async (req, res) => {
-  try {
-    const { loanID } = req.params;
-    const pool = await sql.connect(dbConfig);
+    try {
+        const { loanID } = req.params;
+        const pool = await sql.connect(dbConfig);
 
-    // Gọi hàm SQL fn_CalculateFine để lấy số tiền chính xác
-    // Hàm này sẽ trả về 0 nếu tiền phạt đã được đóng (Paid)
-    const result = await pool.request().input("LoanID", sql.VarChar, loanID)
-      .query(`
+        // BƯỚC 1: Kiểm tra xem LoanID có tồn tại và lấy trạng thái Loan
+        const loanCheckQuery = `
+            SELECT LoanID, [Due Date], ReturnDate, [Status] 
+            FROM Loan 
+            WHERE LoanID = @LoanID
+        `;
+        const checkResult = await pool.request()
+            .input("LoanID", sql.VarChar, loanID)
+            .query(loanCheckQuery);
+        
+        if (checkResult.recordset.length === 0) {
+            return res.status(404).send("Lỗi: Không tìm thấy LoanID này trong hệ thống.");
+        }
+
+        const loanRecord = checkResult.recordset[0];
+        
+        // BƯỚC 2: Nếu đã trả sách, trả về lịch sử giao dịch
+        if (loanRecord.ReturnDate !== null) {
+            const fineHistoryQuery = `
+                SELECT 
+                    f.FineID, 
+                    f.Amount, 
+                    f.[Status], 
+                    f.ActionDate AS FinePaymentDate,
+                    l.ReturnDate
+                FROM Fine f
+                JOIN Loan l ON f.LoanID = l.LoanID
+                WHERE f.LoanID = @LoanID;
+            `;
+            const fineHistoryResult = await pool.request()
+                .input("LoanID", sql.VarChar, loanID)
+                .query(fineHistoryQuery);
+
+            return res.json({ 
+                FineAmount: 0, // Đã trả, tiền phạt luôn là 0 (hoặc đã paid)
+                DaysLate: loanRecord.ReturnDate > loanRecord["Due Date"] 
+                            ? Math.max(0, new Date(loanRecord.ReturnDate).getTime() - new Date(loanRecord["Due Date"]).getTime()) / (1000 * 3600 * 24) 
+                            : 0,
+                // Trả về thông tin giao dịch
+                isReturned: true,
+                ReturnDate: loanRecord.ReturnDate,
+                FineHistory: fineHistoryResult.recordset[0] || { Status: 'No Fine', Amount: 0 } // Đảm bảo trả về dữ liệu
+            });
+        }
+        
+        // BƯỚC 3: Nếu chưa trả, tính toán tiền phạt như bình thường
+        const fineResult = await pool.request().input("LoanID", sql.VarChar, loanID)
+            .query(`
                 SELECT dbo.fn_CalculateFine(@LoanID) AS FineAmount,
                 DATEDIFF(DAY, (SELECT [Due Date] FROM Loan WHERE LoanID = @LoanID), GETDATE()) AS DaysLate
             `);
 
-    res.json(result.recordset[0]);
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
+        res.json({
+            ...fineResult.recordset[0],
+            isReturned: false // Đánh dấu chưa trả
+        });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
 });
 
 // ==========================================================
@@ -137,10 +184,7 @@ app.post("/api/loans/return", async (req, res) => {
     const { loanID } = req.body;
     const pool = await sql.connect(dbConfig);
 
-    // Gọi thủ tục sp_ReturnBookAndPayFine
-    // Thủ tục này sẽ: 
-    // 1. Update Loan -> Returned
-    // 2. Update Fine -> Paid (nếu đang Unpaid)
+
     await pool.request()
       .input("LoanID", sql.VarChar, loanID)
       .execute("sp_ReturnBookAndPayFine");
