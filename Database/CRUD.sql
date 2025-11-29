@@ -225,7 +225,7 @@ INSERT INTO BibliographicRecord (RecordID, Title, RefBookID, Publisher, [Year]) 
 ('R009', N'Clean Code: Mã sạch', NULL, N'Nhà xuất bản Khoa học Kỹ thuật', 2017),
 ('R010', N'Clean Architecture: Kiến trúc sạch', NULL, N'Nhà xuất bản Khoa học Kỹ thuật', 2021),
 ('R011', N'Rừng Na Uy', NULL, N'Nhà xuất bản Hội Nhà Văn', 2015),
-('R012', N'Nhập môn Trí tuệ nhân tạo & C#', NULL, N'Nhà xuất bản Đại học Quốc gia', 2025),
+('R012', N'Lập trình C# cơ bản(tái bản lần 2)', 'R001', N'Nhà xuất bản Giáo dục Việt Nam', 2024),
 ('R013', N'Tiếng Anh giao tiếp cơ bản', NULL, N'Nhà xuất bản Giáo dục Việt Nam', 2020);
 
 
@@ -497,7 +497,7 @@ GO
 -- =============================================
 
 -- sp_SearchBookByTitle
-CREATE PROCEDURE sp_SearchBookByTitle
+CREATE OR ALTER PROCEDURE sp_SearchBookByTitle
     @Keyword NVARCHAR(100)
 AS
 BEGIN
@@ -506,19 +506,25 @@ BEGIN
         br.Title,
         br.Publisher,
         br.[Year],
-        a.Fullname AS AuthorName,
+        -- Sử dụng STRING_AGG để gom tất cả tên tác giả thành một chuỗi duy nhất
+        (
+            SELECT STRING_AGG(a.Fullname, N', ')
+            FROM Viet v 
+            JOIN Author a ON v.AuthorID = a.SSN
+            WHERE v.RecordID = br.RecordID
+        ) AS AuthorName,
+        -- Tính số lượng bản sao khả dụng
         COUNT(CASE WHEN bc.[Status] = 'Available' THEN 1 END) AS AvailableCopies
     FROM BibliographicRecord br
-    LEFT JOIN Viet v ON br.RecordID = v.RecordID
-    LEFT JOIN Author a ON v.AuthorID = a.SSN
+    -- Bỏ LEFT JOIN Viet/Author ở cấp ngoài
     LEFT JOIN [Book Copy] bc ON br.RecordID = bc.RecordID
-    WHERE br.Title LIKE '%' + @Keyword + '%'
+    WHERE br.Title LIKE N'%' + @Keyword + N'%'
+    -- Chỉ GROUP BY các thông tin của BibliographicRecord
     GROUP BY 
         br.RecordID,
         br.Title,
         br.Publisher,
-        br.[Year],
-        a.Fullname
+        br.[Year]
     ORDER BY br.Title ASC;
 END;
 GO
@@ -643,24 +649,29 @@ BEGIN
         br.Title,
         br.Publisher,
         br.[Year],
-        a.Fullname AS AuthorName,
+        -- Sử dụng STRING_AGG để gom tất cả tên tác giả thành một chuỗi duy nhất
+        (
+            SELECT STRING_AGG(a.Fullname, N', ')
+            FROM Viet v 
+            JOIN Author a ON v.AuthorID = a.SSN
+            WHERE v.RecordID = br.RecordID
+        ) AS AuthorName,
+        -- Tính số lượng bản sao khả dụng
         COUNT(CASE WHEN bc.[Status] = 'Available' THEN 1 END) AS AvailableCopies
     FROM BibliographicRecord br
-    JOIN Thuoc t ON br.RecordID = t.RecordID
-    LEFT JOIN Viet v ON br.RecordID = v.RecordID
-    LEFT JOIN Author a ON v.AuthorID = a.SSN
+    JOIN Thuoc t ON br.RecordID = t.RecordID -- Chỉ lấy sách thuộc Category
+    -- Bỏ LEFT JOIN Viet/Author ở cấp ngoài
     LEFT JOIN [Book Copy] bc ON br.RecordID = bc.RecordID
     WHERE 
         t.CategoryName = @CategoryName
+    -- Chỉ GROUP BY các thông tin của BibliographicRecord
     GROUP BY 
         br.RecordID,
         br.Title,
         br.Publisher,
-        br.[Year],
-        a.Fullname
+        br.[Year]
     ORDER BY br.Title ASC;
 END;
-GO
 GO
 -- 2.4.1 Ham 1: Tinh toan tien phat (Su dung IF/tinh toan)
 -- Muc dich: Tinh tien phat du kien dua tren so ngay qua han trong bang Loan
