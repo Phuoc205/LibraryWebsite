@@ -235,24 +235,33 @@ INSERT INTO [User] (UserID, Username, [Password], [First Name], [Last Name], Ema
 ('U0000003', 'lib_q1', 'Librarian@2', N'Lê', N'Thủ Thư 2', 'lib2@lib.edu', '33333333', '1992-10-20', N'Quận 1', 'Librarian', '0903333333'),
 ('U0000004', 'stu_loan', 'Student@123', N'Trần', N'Sinh Viên 1', 'stu1@hcmut.edu', '44444444', '2000-03-08', N'Bình Thạnh', 'Student', '0904444444'),
 ('U0000005', 'stu_cart', 'Student@345', N'Hoàng', N'Sinh Viên 2', 'stu2@hcmut.edu', '55555555', '2001-07-25', N'Quận 5', 'Student', '0905555555'),
-('U0000006', 'stu_fine', 'Student@567', N'Võ', N'Sinh Viên 3', 'stu3@hcmut.edu', '66666666', '2002-12-10', N'Quận 7', 'Student', '0906666666');
+('U0000006', 'stu_fine', 'Student@567', N'Võ', N'Sinh Viên 3', 'stu3@hcmut.edu', '66666666', '2002-12-10', N'Quận 7', 'Student', '0906666666'),
+('U0000007', 'lib_b1_new', 'Librarian@3', N'Ngô', N'Thủ Thư 3', 'lib3@lib.edu', '77777777', '1988-03-01', N'Quận 1', 'Librarian', '0907777777'),
+('U0000008', 'lib_b3_new', 'Librarian@4', N'Trịnh', N'Thủ Thư 4', 'lib4@lib.edu', '88888888', '1995-11-25', N'Quận 5', 'Librarian', '0908888888'),
+('U0000009', 'lib_b4_new', 'Librarian@5', N'Đinh', N'Thủ Thư 5', 'lib5@lib.edu', '99999999', '1991-04-12', N'Quận 7', 'Librarian', '0909999999'),
+('U0000010', 'lib_b5_new', 'Librarian@6', N'Bùi', N'Thủ Thư 6', 'lib6@lib.edu', '10101010', '1993-09-09', N'Gò Vấp', 'Librarian', '0910101010'),
+('U0000011', 'stu_2010', 'Student@2010', N'Cao', N'Sinh Viên 4', 'stu4@hcmut.edu', '11111112', '2000-01-20', N'Bình Thạnh', 'Student', '0911111111'),
+('U0000012', 'stu_2110', 'Student@2110', N'Đỗ', N'Sinh Viên 5', 'stu5@hcmut.edu', '12121212', '2001-08-01', N'Quận 5', 'Student', '0912121212'),
+('U0000013', 'stu_2210', 'Student@2210', N'Đinh', N'Sinh Viên 6', 'stu6@hcmut.edu', '13131313', '2002-04-04', N'Thủ Đức', 'Student', '0913131313'),
+('U0000014', 'stu_2211', 'Student@2211', N'Chu', N'Sinh Viên 7', 'stu7@hcmut.edu', '14141414', '2002-11-11', N'Quận 7', 'Student', '0914141414'),
+('U0000015', 'stu_2310', 'Student@2310', N'Dương', N'Sinh Viên 8', 'stu8@hcmut.edu', '15151515', '2003-05-30', N'Gò Vấp', 'Student', '0915151515');
 
 INSERT INTO [Admin] (UserID, AdminCode) VALUES 
-('U0000001', 'AD001'),
-('U0000002', 'AD002'),
-('U0000003', 'AD003'),
-('U0000004', 'AD004'),
-('U0000005', 'AD005');
+('U0000001', 'AD001');
+
 
 INSERT INTO Librarian (UserID, [Branch ID]) VALUES 
-('U0000006', 'B002'), 
-('U0000007', 'B001'),
+('U0000002', 'B002'), 
+('U0000003', 'B001'),
+('U0000007', 'B001'), 
 ('U0000008', 'B003'),
 ('U0000009', 'B004'),
-('U0000010', 'B005')
-;
+('U0000010', 'B005');
 
 INSERT INTO Student (UserID, [Student ID], [Year]) VALUES
+('U0000004', '20100000', 2020),
+('U0000005', '21100000', 2021),
+('U0000006', '22100000', 2022),
 ('U0000011', '20100001', 2020),
 ('U0000012', '21100002', 2021),
 ('U0000013', '22100003', 2022),
