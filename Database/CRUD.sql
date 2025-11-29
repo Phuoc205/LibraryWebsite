@@ -225,8 +225,8 @@ INSERT INTO BibliographicRecord (RecordID, Title, RefBookID, Publisher, [Year]) 
 ('R009', N'Clean Code: Mã sạch', NULL, N'Nhà xuất bản Khoa học Kỹ thuật', 2017),
 ('R010', N'Clean Architecture: Kiến trúc sạch', NULL, N'Nhà xuất bản Khoa học Kỹ thuật', 2021),
 ('R011', N'Rừng Na Uy', NULL, N'Nhà xuất bản Hội Nhà Văn', 2015),
-('R012', N'Nhập môn Trí tuệ nhân tạo & C#', NULL, N'Nhà xuất bản Đại học Quốc gia', 2024),
-('R013', N'Lập trình C# cơ bản (Tái bản lần 2)', 'R001', N'Nhà xuất bản Trẻ', 2024);
+('R012', N'Nhập môn Trí tuệ nhân tạo & C#', NULL, N'Nhà xuất bản Đại học Quốc gia', 2025),
+('R013', N'Lập trình C# cơ bản (Tái bản lần 2)', 'R001', N'Nhà xuất bản Trẻ', 2025);
 
 -- 2.5 User Data
 INSERT INTO [User] (UserID, Username, [Password], [First Name], [Last Name], Email, SSN, Birthday, [Address], UserType, [Phone Number]) VALUES
@@ -276,8 +276,8 @@ INSERT INTO [Book Copy] (BookID, RecordID, [Entry Date], [Branch ID], Manufactur
 ('C004', 'R002', '2023-03-01', 'B001', 'M002', 'Available'),
 ('C005', 'R003', '2022-11-15', 'B003', 'M003', 'Available'),
 ('C006', 'R003', '2022-11-15', 'B003', 'M003', 'Maintenance'),
-('C007', 'R004', '2024-02-20', 'B004', 'M004', 'OnLoan'),
-('C008', 'R004', '2024-02-20', 'B004', 'M004', 'Available'),
+('C007', 'R004', '2025-02-20', 'B004', 'M004', 'OnLoan'),
+('C008', 'R004', '2025-02-20', 'B004', 'M004', 'Available'),
 ('C009', 'R005', '2021-05-05', 'B005', 'M005', 'Available'),
 ('C010', 'R005', '2021-05-05', 'B005', 'M005', 'Maintenance'),
 ('C011', 'R006', '2023-06-01', 'B001', 'M002', 'Available'),
@@ -293,9 +293,9 @@ INSERT INTO [Book Copy] (BookID, RecordID, [Entry Date], [Branch ID], Manufactur
 ('C021', 'R011', '2021-12-12', 'B004', 'M005', 'Available'),
 ('C022', 'R011', '2021-12-12', 'B004', 'M005', 'Available'),
 ('C023', 'R011', '2022-03-10', 'B001', 'M005', 'Lost'),
-('C024', 'R012', '2024-10-01', 'B002', 'M001', 'Available'),
-('C025', 'R012', '2024-10-01', 'B002', 'M001', 'Available'),
-('C026', 'R012', '2024-10-05', 'B001', 'M001', 'OnLoan'),
+('C024', 'R012', '2025-10-01', 'B002', 'M001', 'Available'),
+('C025', 'R012', '2025-10-01', 'B002', 'M001', 'Available'),
+('C026', 'R012', '2025-10-05', 'B001', 'M001', 'OnLoan'),
 ('C027', 'R007', '2023-08-15', 'B001', 'M002', 'Available'),
 ('C028', 'R007', '2023-08-15', 'B002', 'M002', 'Available'),
 ('C029', 'R008', '2023-09-20', 'B001', 'M002', 'Available'),
@@ -343,26 +343,26 @@ INSERT INTO Thuoc (CategoryName, RecordID) VALUES
 
 -- 2.10 Circulation Data
 INSERT INTO Loan (LoanID, LoanDate, [Due Date], ReturnDate, [Status], [Handler ID], BorrowerID, BookID) VALUES
-('L001', '2024-10-01', '2024-10-15', '2024-10-14', 'Returned', 'U0000003', 'U0000004', 'C002'),
-('L002', '2024-10-20', '2024-11-03', NULL, 'OnLoan', 'U0000003', 'U0000004', 'C003'),
-('L003', '2024-10-10', '2024-10-24', '2024-11-05', 'Returned', 'U0000002', 'U0000006', 'C004'),
-('L004', '2024-09-01', '2024-09-15', NULL, 'Overdue', 'U0000002', 'U0000006', 'C001'),
-('L005', '2024-11-01', '2024-11-15', NULL, 'OnLoan', 'U0000003', 'U0000004', 'C007');
+('L001', '2025-10-01', '2025-10-15', '2025-10-14', 'Returned', 'U0000003', 'U0000004', 'C002'),
+('L002', '2025-10-20', '2025-11-03', NULL, 'Overdue', 'U0000003', 'U0000004', 'C003'),
+('L003', '2025-10-10', '2025-10-24', '2025-11-05', 'Returned', 'U0000002', 'U0000006', 'C004'),
+('L004', '2025-09-01', '2025-09-15', NULL, 'Overdue', 'U0000002', 'U0000006', 'C001'),
+('L005', '2025-11-30', '2025-12-14', NULL, 'OnLoan', 'U0000003', 'U0000004', 'C007');
 
 INSERT INTO Cart (CartID, InitialDate, [Status], UserID) VALUES
-('CT001', '2024-11-19', 'Active', 'U0000005'),
-('CT002', '2024-11-19', 'Active', 'U0000004'),
-('CT003', '2024-11-18', 'Completed', 'U0000006'),
-('CT004', '2024-11-17', 'Cancelled', 'U0000005'),
-('CT005', '2024-11-19', 'Active', 'U0000004');
+('CT001', '2025-11-19', 'Active', 'U0000005'),
+('CT002', '2025-11-19', 'Active', 'U0000004'),
+('CT003', '2025-11-18', 'Completed', 'U0000006'),
+('CT004', '2025-11-17', 'Cancelled', 'U0000005'),
+('CT005', '2025-11-19', 'Active', 'U0000004');
 
 INSERT INTO [Cart Contain] (CartID, BookID) VALUES
 ('CT001', 'C002'), ('CT001', 'C004'), ('CT002', 'C005'), ('CT003', 'C008'), ('CT005', 'C009');
 
 INSERT INTO Fine (FineID, Amount, Reason, [Status], HandlerID, LoanID, [Closing Date], ActionDate) VALUES
-('F001', 100000.00, N'Hư hỏng nhẹ bìa sách', 'Paid', 'U0000002', 'L001', '2024-10-14', '2024-10-14'),
-('F002', 50000.00, N'Trả sách quá hạn 1 ngày', 'Paid', 'U0000002', 'L003', '2024-11-05', '2024-11-05'),
-('F003', 20000.00, N'Mất thẻ thư viện', 'Paid', 'U0000001', 'L001', '2024-10-14', '2024-10-14'),
+('F001', 100000.00, N'Hư hỏng nhẹ bìa sách', 'Paid', 'U0000002', 'L001', '2025-10-14', '2025-10-14'),
+('F002', 50000.00, N'Trả sách quá hạn 1 ngày', 'Paid', 'U0000002', 'L003', '2025-11-05', '2025-11-05'),
+('F003', 20000.00, N'Mất thẻ thư viện', 'Paid', 'U0000001', 'L001', '2025-10-14', '2025-10-14'),
 ('F004', 50000.00, N'Trả sách quá hạn', 'Unpaid', 'U0000002', 'L004', NULL, NULL),
 ('F005', 200000.00, N'Mất sách', 'Unpaid', 'U0000003', 'L002', NULL, NULL);
 GO
