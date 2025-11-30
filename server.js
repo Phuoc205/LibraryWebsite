@@ -269,6 +269,33 @@ app.get("/api/categories", async (req, res) => {
   }
 });
 
+app.post("/api/insert/books", async (req, res) => {
+  console.log("Incoming request body:", req.body); // log luôn
+  try {
+    const { title, refBookID, publisher, year, authorName, authorID, authorBio } = req.body;
+
+    const pool = await sql.connect(dbConfig);
+    const result = await pool.request()
+      .input("Title", sql.NVarChar(200), title)
+      .input("RefBookID", sql.VarChar(10), refBookID || null)
+      .input("Publisher", sql.NVarChar(100), publisher)
+      .input("Year", sql.Int, year)
+      .input("AuthorName", sql.NVarChar(100), authorName)
+      .input("AuthorID", sql.VarChar(10), authorID)
+      .input("AuthorBio", sql.NVarChar(sql.MAX), authorBio)
+      .execute("sp_InsertBibliographicRecord");
+
+    console.log("SQL result:", result.recordset);
+
+    const data = result.recordset[0];
+    res.json({ id: data.NewRecordID });
+  } catch (err) {
+    console.error("Server error:", err);
+    res.status(500).json({ error: "server_error", detail: err.message });
+  }
+});
+
+
 // Khởi chạy server
 app.listen(PORT, () => {
   console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);

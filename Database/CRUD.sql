@@ -807,3 +807,78 @@ BEGIN
     END CATCH
 END;
 GO
+
+-- procedure insertbibliographicRecord
+CREATE PROCEDURE sp_InsertBibliographicRecord
+    @Title        NVARCHAR(200),
+    @RefBookID    VARCHAR(10) = NULL,
+    @Publisher    NVARCHAR(100),
+    @Year         INT,
+    @AuthorName   NVARCHAR(100),
+    @AuthorID     VARCHAR(10),
+    @AuthorBio    NVARCHAR(MAX)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @NextID VARCHAR(10);
+    DECLARE @MaxID VARCHAR(10);
+    DECLARE @NumPart INT;
+
+    -- Validate Year
+    IF (@Year < 0 OR @Year > YEAR(GETDATE()))
+    BEGIN
+        SELECT 'Invalid year' AS Error;
+        RETURN;
+    END
+
+    -- Validate Title
+    IF LEN(LTRIM(RTRIM(@Title))) = 0
+    BEGIN
+        SELECT 'Title cannot be empty' AS Error;
+        RETURN;
+    END
+
+    -- RefBookID validation
+    IF (@RefBookID IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM BibliographicRecord WHERE RecordID = @RefBookID
+    ))
+    BEGIN
+        SELECT 'RefBookID does not exist' AS Error;
+        RETURN;
+    END
+
+    DECLARE @MaxNum INT;
+
+    SELECT @MaxNum = MAX(
+        TRY_CAST(SUBSTRING(RecordID, 2, LEN(RecordID)) AS INT)
+    )
+    FROM BibliographicRecord;
+
+    SET @MaxNum = ISNULL(@MaxNum, 0);
+    IF @MaxNum < 999
+        SET @NextID = 'R' + RIGHT('000' + CAST(@MaxNum + 1 AS VARCHAR(3)), 3);
+    ELSE
+        SET @NextID = 'R' + RIGHT('0000' + CAST(@MaxNum + 1 AS VARCHAR(4)), 4);
+
+
+    BEGIN TRY
+        INSERT INTO BibliographicRecord(RecordID, Title, RefBookID, Publisher, [Year])
+        VALUES (@NextID, @Title, @RefBookID, @Publisher, @Year);
+
+        IF NOT EXISTS (SELECT 1 FROM Author WHERE SSN = @AuthorID)
+        BEGIN
+            INSERT INTO Author(SSN, Fullname, Biography)
+            VALUES (@AuthorID, @AuthorName, @AuthorBio);
+        END
+
+        INSERT INTO Viet (AuthorID, RecordID)
+        VALUES (@AuthorID, @NextID);
+
+        SELECT @NextID AS NewRecordID, 'success' AS Status;
+
+    END TRY
+    BEGIN CATCH
+        SELECT ERROR_MESSAGE() AS Error;
+    END CATCH
+END
