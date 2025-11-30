@@ -35,7 +35,41 @@ sql
 
 // ================= API ENDPOINTS =================
 
-// API 1: Tìm kiếm sách (Gọi Stored Procedure: sp_SearchBooks)
+// API: Lấy thông tin phiếu mượn (Loan) theo LoanID
+app.get("/api/loan/:loanID", async (req, res) => {
+  try {
+    const { loanID } = req.params;
+    const pool = await sql.connect(dbConfig);
+    const result = await pool
+      .request()
+      .input("LoanID", sql.VarChar, loanID)
+      .query("SELECT LoanID, BorrowerID FROM Loan WHERE LoanID = @LoanID");
+    if (result.recordset.length === 0) {
+      res.status(404).send("Không tìm thấy phiếu mượn");
+    } else {
+      res.json(result.recordset[0]);
+    }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// API: Lấy danh sách sách quá hạn của một user
+app.get("/api/user/overdue-books/:userID", async (req, res) => {
+  try {
+    const { userID } = req.params;
+    const pool = await sql.connect(dbConfig);
+    const result = await pool
+      .request()
+      .input("UserID", sql.Char(8), userID)
+      .query("SELECT dbo.fn_ListOverdueBooksByUser(@UserID) AS OverdueBooks");
+    res.json(result.recordset[0]);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// API 1: Tìm kiếm sách
 app.get("/api/books/search", async (req, res) => {
   try {
     const { keyword } = req.query;
@@ -52,7 +86,7 @@ app.get("/api/books/search", async (req, res) => {
   }
 });
 
-// API 2: Thêm sách mới (INSERT)
+// API 2: Thêm sách mới
 app.post("/api/books", async (req, res) => {
   try {
     const { recordID, title, publisher, year } = req.body;
@@ -76,83 +110,124 @@ app.post("/api/books", async (req, res) => {
 
 // API 3: Kiểm tra tiền phạt (Gọi Function SQL)
 app.get("/api/loans/fine/:loanID", async (req, res) => {
-  try {
-    const { loanID } = req.params;
-    const pool = await sql.connect(dbConfig);
+    try {
+        const { loanID } = req.params;
+        const pool = await sql.connect(dbConfig);
 
-    // Giả sử 5000đ/ngày phạt. Logic tính: Ngày trả (Hôm nay) - Hạn trả
-    const result = await pool.request().input("LoanID", sql.VarChar, loanID)
-      .query(`
-                DECLARE @DueDate DATE;
-                DECLARE @FineAmount DECIMAL(10,2) = 0;
-                
-                SELECT @DueDate = [Due Date] FROM Loan WHERE LoanID = @LoanID;
-                
-                IF GETDATE() > @DueDate
-                    SET @FineAmount = DATEDIFF(DAY, @DueDate, GETDATE()) * 5000;
-                
-                SELECT @FineAmount AS FineAmount, DATEDIFF(DAY, @DueDate, GETDATE()) AS DaysLate
+        // BƯỚC 1: Kiểm tra xem LoanID có tồn tại và lấy trạng thái Loan
+        const loanCheckQuery = `
+            SELECT LoanID, [Due Date], ReturnDate, [Status] 
+            FROM Loan 
+            WHERE LoanID = @LoanID
+        `;
+        const checkResult = await pool.request()
+            .input("LoanID", sql.VarChar, loanID)
+            .query(loanCheckQuery);
+        
+        if (checkResult.recordset.length === 0) {
+            return res.status(404).send("Lỗi: Không tìm thấy LoanID này trong hệ thống.");
+        }
+
+        const loanRecord = checkResult.recordset[0];
+        
+        // BƯỚC 2: Nếu đã trả sách, trả về lịch sử giao dịch
+        if (loanRecord.ReturnDate !== null) {
+            const fineHistoryQuery = `
+                SELECT 
+                    f.FineID, 
+                    f.Amount, 
+                    f.[Status], 
+                    f.ActionDate AS FinePaymentDate,
+                    l.ReturnDate
+                FROM Fine f
+                JOIN Loan l ON f.LoanID = l.LoanID
+                WHERE f.LoanID = @LoanID;
+            `;
+            const fineHistoryResult = await pool.request()
+                .input("LoanID", sql.VarChar, loanID)
+                .query(fineHistoryQuery);
+
+            return res.json({ 
+                FineAmount: 0, // Đã trả, tiền phạt luôn là 0 (hoặc đã paid)
+                DaysLate: loanRecord.ReturnDate > loanRecord["Due Date"] 
+                            ? Math.max(0, new Date(loanRecord.ReturnDate).getTime() - new Date(loanRecord["Due Date"]).getTime()) / (1000 * 3600 * 24) 
+                            : 0,
+                // Trả về thông tin giao dịch
+                isReturned: true,
+                ReturnDate: loanRecord.ReturnDate,
+                FineHistory: fineHistoryResult.recordset[0] || { Status: 'No Fine', Amount: 0 } // Đảm bảo trả về dữ liệu
+            });
+        }
+        
+        // BƯỚC 3: Nếu chưa trả, tính toán tiền phạt như bình thường
+        const fineResult = await pool.request().input("LoanID", sql.VarChar, loanID)
+            .query(`
+                SELECT dbo.fn_CalculateFine(@LoanID) AS FineAmount,
+                DATEDIFF(DAY, (SELECT [Due Date] FROM Loan WHERE LoanID = @LoanID), GETDATE()) AS DaysLate
             `);
 
-    res.json(result.recordset[0]);
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
+        res.json({
+            ...fineResult.recordset[0],
+            isReturned: false // Đánh dấu chưa trả
+        });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
 });
 
-// API 4: Trả sách (UPDATE + Trigger sẽ tự chạy)
+// ==========================================================
+// API 4 [QUAN TRỌNG]: Trả sách & Thu tiền (ĐÃ SỬA)
+// Thay vì UPDATE thủ công, ta gọi Stored Procedure để đảm bảo Transaction
+// ==========================================================
 app.post("/api/loans/return", async (req, res) => {
   try {
     const { loanID } = req.body;
     const pool = await sql.connect(dbConfig);
 
-    // Update trạng thái Loan -> Trigger 'trg_UpdateBookCopyStatus' sẽ tự update kho sách
-    await pool.request().input("LoanID", sql.VarChar, loanID).query(`
-                UPDATE Loan 
-                SET ReturnDate = GETDATE(), Status = 'Returned'
-                WHERE LoanID = @LoanID
-            `);
 
-    res.json({ message: "Trả sách thành công" });
+    await pool.request()
+      .input("LoanID", sql.VarChar, loanID)
+      .execute("sp_ReturnBookAndPayFine");
+
+    res.json({ message: "Đã trả sách và thanh toán phạt thành công!" });
   } catch (err) {
+    console.error("Lỗi trả sách:", err.message);
     res.status(500).send(err.message);
   }
 });
+// ==========================================================
 
-// API: Sửa thông tin sách (SET)
+
+// API: Sửa thông tin sách
 app.put("/api/books/:id", async (req, res) => {
   try {
-    const { id } = req.params; // Lấy RecordID từ URL (ví dụ: /api/books/R001)
-    const { title, publisher, year, refBookID } = req.body; // Lấy dữ liệu cần sửa từ Body
+    const { id } = req.params; 
+    const { title, publisher, year, refBookID } = req.body; 
 
     const pool = await sql.connect(dbConfig);
 
     await pool
       .request()
-      .input("RecordID", sql.VarChar, id) // Map với @RecordID
-      .input("Title", sql.NVarChar, title) // Map với @Title
-      .input("Publisher", sql.NVarChar, publisher) // Map với @Publisher
-      .input("Year", sql.Int, year) // Map với @Year
-      // Xử lý RefBookID: nếu gửi lên chuỗi rỗng hoặc undefined thì chuyển thành NULL
+      .input("RecordID", sql.VarChar, id)
+      .input("Title", sql.NVarChar, title)
+      .input("Publisher", sql.NVarChar, publisher)
+      .input("Year", sql.Int, year)
       .input("RefBookID", sql.VarChar, refBookID ? refBookID : null)
       .execute("sp_UpdateBibliographicRecord");
 
     res.json({ message: "Cập nhật sách thành công!" });
   } catch (err) {
-    // Nếu SP bắn lỗi (RAISERROR) như: sai năm, sai mã tham khảo... nó sẽ vào đây
     console.error("Lỗi khi cập nhật:", err.message);
     res.status(500).send(err.message);
   }
 });
-// API: XÓA thông tin sách (DELETE)
+
+// API: XÓA thông tin sách
 app.delete("/api/books/:id", async (req, res) => {
   try {
-    const { id } = req.params; // Lấy ID từ URL (ví dụ: /api/books/R001)
+    const { id } = req.params;
     const pool = await sql.connect(dbConfig);
 
-    // Gọi Stored Procedure sp_DeleteBibliographicRecord
-    // SP này đã bao gồm logic kiểm tra ràng buộc (Book Copy, RefBook)
-    // và tự động xóa dữ liệu liên quan (Viet, Thuoc, Keywords)
     await pool
       .request()
       .input("RecordID", sql.VarChar, id)
@@ -160,13 +235,12 @@ app.delete("/api/books/:id", async (req, res) => {
 
     res.json({ message: "Xóa sách thành công" });
   } catch (err) {
-    // Nếu SP bắn lỗi RAISERROR (ví dụ: còn sách trong kho), nó sẽ nhảy vào đây
     console.error("Lỗi khi xóa:", err.message);
     res.status(500).send(err.message);
   }
 });
 
-// API 6: Lọc sách theo thể loại (Gọi SP riêng)
+// API 6: Lọc sách theo thể loại
 app.get("/api/books/filter-by-category", async (req, res) => {
   try {
     const { category } = req.query;

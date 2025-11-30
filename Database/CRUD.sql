@@ -225,8 +225,9 @@ INSERT INTO BibliographicRecord (RecordID, Title, RefBookID, Publisher, [Year]) 
 ('R009', N'Clean Code: Mã sạch', NULL, N'Nhà xuất bản Khoa học Kỹ thuật', 2017),
 ('R010', N'Clean Architecture: Kiến trúc sạch', NULL, N'Nhà xuất bản Khoa học Kỹ thuật', 2021),
 ('R011', N'Rừng Na Uy', NULL, N'Nhà xuất bản Hội Nhà Văn', 2015),
-('R012', N'Nhập môn Trí tuệ nhân tạo & C#', NULL, N'Nhà xuất bản Đại học Quốc gia', 2024),
-('R013', N'Lập trình C# cơ bản (Tái bản lần 2)', 'R001', N'Nhà xuất bản Trẻ', 2024);
+('R012', N'Lập trình C# cơ bản(tái bản lần 2)', 'R001', N'Nhà xuất bản Giáo dục Việt Nam', 2024),
+('R013', N'Tiếng Anh giao tiếp cơ bản', NULL, N'Nhà xuất bản Giáo dục Việt Nam', 2020);
+
 
 -- 2.5 User Data
 INSERT INTO [User] (UserID, Username, [Password], [First Name], [Last Name], Email, SSN, Birthday, [Address], UserType, [Phone Number]) VALUES
@@ -235,24 +236,33 @@ INSERT INTO [User] (UserID, Username, [Password], [First Name], [Last Name], Ema
 ('U0000003', 'lib_q1', 'Librarian@2', N'Lê', N'Thủ Thư 2', 'lib2@lib.edu', '33333333', '1992-10-20', N'Quận 1', 'Librarian', '0903333333'),
 ('U0000004', 'stu_loan', 'Student@123', N'Trần', N'Sinh Viên 1', 'stu1@hcmut.edu', '44444444', '2000-03-08', N'Bình Thạnh', 'Student', '0904444444'),
 ('U0000005', 'stu_cart', 'Student@345', N'Hoàng', N'Sinh Viên 2', 'stu2@hcmut.edu', '55555555', '2001-07-25', N'Quận 5', 'Student', '0905555555'),
-('U0000006', 'stu_fine', 'Student@567', N'Võ', N'Sinh Viên 3', 'stu3@hcmut.edu', '66666666', '2002-12-10', N'Quận 7', 'Student', '0906666666');
+('U0000006', 'stu_fine', 'Student@567', N'Võ', N'Sinh Viên 3', 'stu3@hcmut.edu', '66666666', '2002-12-10', N'Quận 7', 'Student', '0906666666'),
+('U0000007', 'lib_b1_new', 'Librarian@3', N'Ngô', N'Thủ Thư 3', 'lib3@lib.edu', '77777777', '1988-03-01', N'Quận 1', 'Librarian', '0907777777'),
+('U0000008', 'lib_b3_new', 'Librarian@4', N'Trịnh', N'Thủ Thư 4', 'lib4@lib.edu', '88888888', '1995-11-25', N'Quận 5', 'Librarian', '0908888888'),
+('U0000009', 'lib_b4_new', 'Librarian@5', N'Đinh', N'Thủ Thư 5', 'lib5@lib.edu', '99999999', '1991-04-12', N'Quận 7', 'Librarian', '0909999999'),
+('U0000010', 'lib_b5_new', 'Librarian@6', N'Bùi', N'Thủ Thư 6', 'lib6@lib.edu', '10101010', '1993-09-09', N'Gò Vấp', 'Librarian', '0910101010'),
+('U0000011', 'stu_2010', 'Student@2010', N'Cao', N'Sinh Viên 4', 'stu4@hcmut.edu', '11111112', '2000-01-20', N'Bình Thạnh', 'Student', '0911111111'),
+('U0000012', 'stu_2110', 'Student@2110', N'Đỗ', N'Sinh Viên 5', 'stu5@hcmut.edu', '12121212', '2001-08-01', N'Quận 5', 'Student', '0912121212'),
+('U0000013', 'stu_2210', 'Student@2210', N'Đinh', N'Sinh Viên 6', 'stu6@hcmut.edu', '13131313', '2002-04-04', N'Thủ Đức', 'Student', '0913131313'),
+('U0000014', 'stu_2211', 'Student@2211', N'Chu', N'Sinh Viên 7', 'stu7@hcmut.edu', '14141414', '2002-11-11', N'Quận 7', 'Student', '0914141414'),
+('U0000015', 'stu_2310', 'Student@2310', N'Dương', N'Sinh Viên 8', 'stu8@hcmut.edu', '15151515', '2003-05-30', N'Gò Vấp', 'Student', '0915151515');
 
 INSERT INTO [Admin] (UserID, AdminCode) VALUES 
-('U0000001', 'AD001'),
-('U0000002', 'AD002'),
-('U0000003', 'AD003'),
-('U0000004', 'AD004'),
-('U0000005', 'AD005');
+('U0000001', 'AD001');
+
 
 INSERT INTO Librarian (UserID, [Branch ID]) VALUES 
-('U0000006', 'B002'), 
-('U0000007', 'B001'),
+('U0000002', 'B002'), 
+('U0000003', 'B001'),
+('U0000007', 'B001'), 
 ('U0000008', 'B003'),
 ('U0000009', 'B004'),
-('U0000010', 'B005')
-;
+('U0000010', 'B005');
 
 INSERT INTO Student (UserID, [Student ID], [Year]) VALUES
+('U0000004', '20100000', 2020),
+('U0000005', '21100000', 2021),
+('U0000006', '22100000', 2022),
 ('U0000011', '20100001', 2020),
 ('U0000012', '21100002', 2021),
 ('U0000013', '22100003', 2022),
@@ -267,8 +277,8 @@ INSERT INTO [Book Copy] (BookID, RecordID, [Entry Date], [Branch ID], Manufactur
 ('C004', 'R002', '2023-03-01', 'B001', 'M002', 'Available'),
 ('C005', 'R003', '2022-11-15', 'B003', 'M003', 'Available'),
 ('C006', 'R003', '2022-11-15', 'B003', 'M003', 'Maintenance'),
-('C007', 'R004', '2024-02-20', 'B004', 'M004', 'OnLoan'),
-('C008', 'R004', '2024-02-20', 'B004', 'M004', 'Available'),
+('C007', 'R004', '2025-02-20', 'B004', 'M004', 'OnLoan'),
+('C008', 'R004', '2025-02-20', 'B004', 'M004', 'Available'),
 ('C009', 'R005', '2021-05-05', 'B005', 'M005', 'Available'),
 ('C010', 'R005', '2021-05-05', 'B005', 'M005', 'Maintenance'),
 ('C011', 'R006', '2023-06-01', 'B001', 'M002', 'Available'),
@@ -284,9 +294,9 @@ INSERT INTO [Book Copy] (BookID, RecordID, [Entry Date], [Branch ID], Manufactur
 ('C021', 'R011', '2021-12-12', 'B004', 'M005', 'Available'),
 ('C022', 'R011', '2021-12-12', 'B004', 'M005', 'Available'),
 ('C023', 'R011', '2022-03-10', 'B001', 'M005', 'Lost'),
-('C024', 'R012', '2024-10-01', 'B002', 'M001', 'Available'),
-('C025', 'R012', '2024-10-01', 'B002', 'M001', 'Available'),
-('C026', 'R012', '2024-10-05', 'B001', 'M001', 'OnLoan'),
+('C024', 'R012', '2025-10-01', 'B002', 'M001', 'Available'),
+('C025', 'R012', '2025-10-01', 'B002', 'M001', 'Available'),
+('C026', 'R012', '2025-10-05', 'B001', 'M001', 'OnLoan'),
 ('C027', 'R007', '2023-08-15', 'B001', 'M002', 'Available'),
 ('C028', 'R007', '2023-08-15', 'B002', 'M002', 'Available'),
 ('C029', 'R008', '2023-09-20', 'B001', 'M002', 'Available'),
@@ -334,26 +344,26 @@ INSERT INTO Thuoc (CategoryName, RecordID) VALUES
 
 -- 2.10 Circulation Data
 INSERT INTO Loan (LoanID, LoanDate, [Due Date], ReturnDate, [Status], [Handler ID], BorrowerID, BookID) VALUES
-('L001', '2024-10-01', '2024-10-15', '2024-10-14', 'Returned', 'U0000003', 'U0000004', 'C002'),
-('L002', '2024-10-20', '2024-11-03', NULL, 'OnLoan', 'U0000003', 'U0000004', 'C003'),
-('L003', '2024-10-10', '2024-10-24', '2024-11-05', 'Returned', 'U0000002', 'U0000006', 'C004'),
-('L004', '2024-09-01', '2024-09-15', NULL, 'Overdue', 'U0000002', 'U0000006', 'C001'),
-('L005', '2024-11-01', '2024-11-15', NULL, 'OnLoan', 'U0000003', 'U0000004', 'C007');
+('L001', '2025-10-01', '2025-10-15', '2025-10-14', 'Returned', 'U0000003', 'U0000004', 'C002'),
+('L002', '2025-10-20', '2025-11-03', NULL, 'Overdue', 'U0000003', 'U0000004', 'C003'),
+('L003', '2025-10-10', '2025-10-24', '2025-11-05', 'Returned', 'U0000002', 'U0000006', 'C004'),
+('L004', '2025-09-01', '2025-09-15', NULL, 'Overdue', 'U0000002', 'U0000006', 'C001'),
+('L005', '2025-11-30', '2025-12-14', NULL, 'OnLoan', 'U0000003', 'U0000004', 'C007');
 
 INSERT INTO Cart (CartID, InitialDate, [Status], UserID) VALUES
-('CT001', '2024-11-19', 'Active', 'U0000005'),
-('CT002', '2024-11-19', 'Active', 'U0000004'),
-('CT003', '2024-11-18', 'Completed', 'U0000006'),
-('CT004', '2024-11-17', 'Cancelled', 'U0000005'),
-('CT005', '2024-11-19', 'Active', 'U0000004');
+('CT001', '2025-11-19', 'Active', 'U0000005'),
+('CT002', '2025-11-19', 'Active', 'U0000004'),
+('CT003', '2025-11-18', 'Completed', 'U0000006'),
+('CT004', '2025-11-17', 'Cancelled', 'U0000005'),
+('CT005', '2025-11-19', 'Active', 'U0000004');
 
 INSERT INTO [Cart Contain] (CartID, BookID) VALUES
 ('CT001', 'C002'), ('CT001', 'C004'), ('CT002', 'C005'), ('CT003', 'C008'), ('CT005', 'C009');
 
 INSERT INTO Fine (FineID, Amount, Reason, [Status], HandlerID, LoanID, [Closing Date], ActionDate) VALUES
-('F001', 100000.00, N'Hư hỏng nhẹ bìa sách', 'Paid', 'U0000002', 'L001', '2024-10-14', '2024-10-14'),
-('F002', 50000.00, N'Trả sách quá hạn 1 ngày', 'Paid', 'U0000002', 'L003', '2024-11-05', '2024-11-05'),
-('F003', 20000.00, N'Mất thẻ thư viện', 'Paid', 'U0000001', 'L001', '2024-10-14', '2024-10-14'),
+('F001', 100000.00, N'Hư hỏng nhẹ bìa sách', 'Paid', 'U0000002', 'L001', '2025-10-14', '2025-10-14'),
+('F002', 50000.00, N'Trả sách quá hạn 1 ngày', 'Paid', 'U0000002', 'L003', '2025-11-05', '2025-11-05'),
+('F003', 20000.00, N'Mất thẻ thư viện', 'Paid', 'U0000001', 'L001', '2025-10-14', '2025-10-14'),
 ('F004', 50000.00, N'Trả sách quá hạn', 'Unpaid', 'U0000002', 'L004', NULL, NULL),
 ('F005', 200000.00, N'Mất sách', 'Unpaid', 'U0000003', 'L002', NULL, NULL);
 GO
@@ -487,7 +497,7 @@ GO
 -- =============================================
 
 -- sp_SearchBookByTitle
-CREATE PROCEDURE sp_SearchBookByTitle
+CREATE OR ALTER PROCEDURE sp_SearchBookByTitle
     @Keyword NVARCHAR(100)
 AS
 BEGIN
@@ -496,19 +506,25 @@ BEGIN
         br.Title,
         br.Publisher,
         br.[Year],
-        a.Fullname AS AuthorName,
+        -- Sử dụng STRING_AGG để gom tất cả tên tác giả thành một chuỗi duy nhất
+        (
+            SELECT STRING_AGG(a.Fullname, N', ')
+            FROM Viet v 
+            JOIN Author a ON v.AuthorID = a.SSN
+            WHERE v.RecordID = br.RecordID
+        ) AS AuthorName,
+        -- Tính số lượng bản sao khả dụng
         COUNT(CASE WHEN bc.[Status] = 'Available' THEN 1 END) AS AvailableCopies
     FROM BibliographicRecord br
-    LEFT JOIN Viet v ON br.RecordID = v.RecordID
-    LEFT JOIN Author a ON v.AuthorID = a.SSN
+    -- Bỏ LEFT JOIN Viet/Author ở cấp ngoài
     LEFT JOIN [Book Copy] bc ON br.RecordID = bc.RecordID
-    WHERE br.Title LIKE '%' + @Keyword + '%'
+    WHERE br.Title LIKE N'%' + @Keyword + N'%'
+    -- Chỉ GROUP BY các thông tin của BibliographicRecord
     GROUP BY 
         br.RecordID,
         br.Title,
         br.Publisher,
-        br.[Year],
-        a.Fullname
+        br.[Year]
     ORDER BY br.Title ASC;
 END;
 GO
@@ -633,22 +649,162 @@ BEGIN
         br.Title,
         br.Publisher,
         br.[Year],
-        a.Fullname AS AuthorName,
+        -- Sử dụng STRING_AGG để gom tất cả tên tác giả thành một chuỗi duy nhất
+        (
+            SELECT STRING_AGG(a.Fullname, N', ')
+            FROM Viet v 
+            JOIN Author a ON v.AuthorID = a.SSN
+            WHERE v.RecordID = br.RecordID
+        ) AS AuthorName,
+        -- Tính số lượng bản sao khả dụng
         COUNT(CASE WHEN bc.[Status] = 'Available' THEN 1 END) AS AvailableCopies
     FROM BibliographicRecord br
-    JOIN Thuoc t ON br.RecordID = t.RecordID
-    LEFT JOIN Viet v ON br.RecordID = v.RecordID
-    LEFT JOIN Author a ON v.AuthorID = a.SSN
+    JOIN Thuoc t ON br.RecordID = t.RecordID -- Chỉ lấy sách thuộc Category
+    -- Bỏ LEFT JOIN Viet/Author ở cấp ngoài
     LEFT JOIN [Book Copy] bc ON br.RecordID = bc.RecordID
     WHERE 
         t.CategoryName = @CategoryName
+    -- Chỉ GROUP BY các thông tin của BibliographicRecord
     GROUP BY 
         br.RecordID,
         br.Title,
         br.Publisher,
-        br.[Year],
-        a.Fullname
+        br.[Year]
     ORDER BY br.Title ASC;
+END;
+GO
+-- 2.4.1 Ham 1: Tinh toan tien phat (Su dung IF/tinh toan)
+-- Muc dich: Tinh tien phat du kien dua tren so ngay qua han trong bang Loan
+IF OBJECT_ID('fn_CalculateFine') IS NOT NULL
+    DROP FUNCTION fn_CalculateFine;
+GO
+
+CREATE FUNCTION fn_CalculateFine (@LoanID VARCHAR(8))
+RETURNS DECIMAL(10,2)
+AS
+BEGIN
+    DECLARE @FineAmount DECIMAL(10,2) = 0;
+    DECLARE @DueDate DATE;
+    DECLARE @ReturnDate DATE;
+    DECLARE @DaysOverdue INT;
+    DECLARE @DailyFineRate DECIMAL(10,2) = 5000; -- Muc phat: 5000 dong/ngay
+
+    -- Kiem tra xem LoanID co ton tai khong
+    IF NOT EXISTS (SELECT 1 FROM Loan WHERE LoanID = @LoanID)
+        RETURN 0;
+
+    -- Nếu tất cả phiếu phạt liên quan đã Paid thì không còn phạt
+    IF NOT EXISTS (SELECT 1 FROM Fine WHERE LoanID = @LoanID AND [Status] = 'Unpaid')
+        RETURN 0;
+
+    -- Lay thong tin Han Tra va Ngay Tra tu bang Loan
+    SELECT @DueDate = [Due Date], @ReturnDate = ReturnDate
+    FROM Loan
+    WHERE LoanID = @LoanID;
+
+    -- Neu chua tra sach (ReturnDate la NULL), tinh den hom nay
+    IF @ReturnDate IS NULL
+        SET @ReturnDate = CAST(GETDATE() AS DATE);
+
+    -- Logic IF: Chi phat neu Ngay tra thuc te > Han tra
+    IF @ReturnDate > @DueDate
+    BEGIN
+        SET @DaysOverdue = DATEDIFF(DAY, @DueDate, @ReturnDate);
+        SET @FineAmount = @DaysOverdue * @DailyFineRate;
+    END
+
+    RETURN @FineAmount;
+END;
+GO
+
+-- 2.4.2 Ham 2: Liet ke sach qua han (Su dung CURSOR)
+-- Muc dich: Tra ve chuoi ten cac cuon sach dang bi qua han cua 1 User
+IF OBJECT_ID('fn_ListOverdueBooksByUser') IS NOT NULL
+    DROP FUNCTION fn_ListOverdueBooksByUser;
+GO
+
+CREATE FUNCTION fn_ListOverdueBooksByUser (@UserID CHAR(8))
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    DECLARE @BookList NVARCHAR(MAX) = '';
+    DECLARE @Title NVARCHAR(200);
+
+    -- Kiem tra User ton tai
+    IF NOT EXISTS (SELECT 1 FROM [User] WHERE UserID = @UserID)
+        RETURN N'User không tồn tại';
+
+    -- Khai bao CURSOR de duyet danh sach sach qua han
+    -- Join cac bang: Loan -> Book Copy -> BibliographicRecord de lay Title
+    DECLARE cur_Overdue CURSOR FOR
+    SELECT br.Title
+    FROM Loan l
+    JOIN [Book Copy] bc ON l.BookID = bc.BookID
+    JOIN BibliographicRecord br ON bc.RecordID = br.RecordID
+    WHERE l.BorrowerID = @UserID 
+      AND l.[Status] = 'Overdue'; -- Chi lay sach co trang thai Overdue
+
+    OPEN cur_Overdue;
+    FETCH NEXT FROM cur_Overdue INTO @Title;
+
+    -- Vong lap duyet tung dong
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        -- Noi chuoi: Neu da co sach truoc do thi them dau phay
+        IF @BookList = ''
+            SET @BookList = @Title;
+        ELSE
+            SET @BookList = @BookList + ', ' + @Title;
+
+        FETCH NEXT FROM cur_Overdue INTO @Title;
+    END;
+
+    CLOSE cur_Overdue;
+    DEALLOCATE cur_Overdue;
+
+    IF @BookList = ''
+        SET @BookList = N'Không có sách quá hạn.';
+
+    RETURN @BookList;
+END;
+GO
+-- =============================================
+-- Muc dich: Xu ly giao dich Tra sach va Thu tien phat cung luc (Transaction)
+-- =============================================
+GO
+
+CREATE OR ALTER PROCEDURE sp_ReturnBookAndPayFine
+    @LoanID VARCHAR(8)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @CalculatedFine DECIMAL(10,2) = dbo.fn_CalculateFine(@LoanID);
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        -- A. Cập nhật trạng thái Phiếu mượn thành Returned
+        UPDATE Loan 
+        SET ReturnDate = GETDATE(), [Status] = 'Returned'
+        WHERE LoanID = @LoanID;
+
+        -- B. Cập nhật Phiếu phạt thành Paid (Nếu có nợ)
+        -- Điều này đảm bảo khi tính lại tiền phạt sẽ ra 0
+        IF EXISTS (SELECT 1 FROM Fine WHERE LoanID = @LoanID AND [Status] = 'Unpaid')
+        BEGIN
+            UPDATE Fine
+            SET [Status] = 'Paid', 
+                [Closing Date] = GETDATE(),
+                Amount = @CalculatedFine,
+                ActionDate = GETDATE()
+            WHERE LoanID = @LoanID AND [Status] = 'Unpaid';
+        END
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+        RAISERROR(@ErrorMessage, 16, 1);
+    END CATCH
 END;
 GO
 
@@ -726,4 +882,3 @@ BEGIN
         SELECT ERROR_MESSAGE() AS Error;
     END CATCH
 END
-GO
