@@ -657,66 +657,73 @@ CREATE PROCEDURE sp_InsertBibliographicRecord
     @Title        NVARCHAR(200),
     @RefBookID    VARCHAR(10) = NULL,
     @Publisher    NVARCHAR(100),
-    @Year         INT
+    @Year         INT,
+    @AuthorName   NVARCHAR(100),
+    @AuthorID     VARCHAR(10),
+    @AuthorBio    NVARCHAR(MAX)
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- 1. KHAI BÁO BIẾN
     DECLARE @NextID VARCHAR(10);
     DECLARE @MaxID VARCHAR(10);
     DECLARE @NumPart INT;
 
-    -- 2. VALIDATE DỮ LIỆU ĐẦU VÀO (Như yêu cầu đề bài)
-    -- Validate 1: Năm xuất bản hợp lệ
+    -- Validate Year
     IF (@Year < 0 OR @Year > YEAR(GETDATE()))
     BEGIN
-        RAISERROR(N'Năm xuất bản không hợp lệ!', 16, 1);
+        SELECT 'Invalid year' AS Error;
         RETURN;
     END
-    -- Validate 2: Tựa đề sách không được trống
-    IF LEN(TRIM(@Title)) = 0
+
+    -- Validate Title
+    IF LEN(LTRIM(RTRIM(@Title))) = 0
     BEGIN
-        RAISERROR(N'Lỗi: Tựa đề sách không được để trống!', 16, 1);
+        SELECT 'Title cannot be empty' AS Error;
         RETURN;
     END
-    -- Validate 3: Kiểm tra RefBookID có tồn tại (nếu được cung cấp)
+
+    -- RefBookID validation
     IF (@RefBookID IS NOT NULL AND NOT EXISTS (
         SELECT 1 FROM BibliographicRecord WHERE RecordID = @RefBookID
     ))
     BEGIN
-        RAISERROR(N'RefBookID không tồn tại!', 16, 1);
+        SELECT 'RefBookID does not exist' AS Error;
         RETURN;
     END
 
-    -- 3. LOGIC TỰ ĐỘNG SINH MÃ (AUTO GENERATE ID)
-    -- Lấy ID lớn nhất hiện tại (Sắp xếp theo độ dài rồi đến giá trị để tránh lỗi R10 < R9)
-    SELECT TOP 1 @MaxID = RecordID 
-    FROM BibliographicRecord 
-    ORDER BY LEN(RecordID) DESC, RecordID DESC;
+    DECLARE @MaxNum INT;
 
-    IF @MaxID IS NULL
-    BEGIN
-        SET @NextID = 'R001';
-    END
+    SELECT @MaxNum = MAX(
+        TRY_CAST(SUBSTRING(RecordID, 2, LEN(RecordID)) AS INT)
+    )
+    FROM BibliographicRecord;
+
+    SET @MaxNum = ISNULL(@MaxNum, 0);
+    IF @MaxNum < 999
+        SET @NextID = 'R' + RIGHT('000' + CAST(@MaxNum + 1 AS VARCHAR(3)), 3);
     ELSE
-    BEGIN
-        SET @NumPart = CAST(SUBSTRING(@MaxID, 2, LEN(@MaxID)) AS INT) + 1;
-        SET @NextID = 'R' + FORMAT(@NumPart, 'D4');
-    END
+        SET @NextID = 'R' + RIGHT('0000' + CAST(@MaxNum + 1 AS VARCHAR(4)), 4);
 
-    -- 4. THỰC HIỆN INSERT
+
     BEGIN TRY
         INSERT INTO BibliographicRecord(RecordID, Title, RefBookID, Publisher, [Year])
         VALUES (@NextID, @Title, @RefBookID, @Publisher, @Year);
 
-        SELECT @NextID AS NewRecordID;
+        IF NOT EXISTS (SELECT 1 FROM Author WHERE SSN = @AuthorID)
+        BEGIN
+            INSERT INTO Author(SSN, Fullname, Biography)
+            VALUES (@AuthorID, @AuthorName, @AuthorBio);
+        END
+
+        INSERT INTO Viet (AuthorID, RecordID)
+        VALUES (@AuthorID, @NextID);
+
+        SELECT @NextID AS NewRecordID, 'success' AS Status;
+
     END TRY
     BEGIN CATCH
-        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
-        RAISERROR(@ErrorMessage, 16, 1);
+        SELECT ERROR_MESSAGE() AS Error;
     END CATCH
-
-    PRINT N'Thêm sách thành công!';
 END
 GO
