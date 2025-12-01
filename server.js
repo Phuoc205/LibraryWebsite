@@ -11,6 +11,7 @@ const dbConfig = {
   password: "12345",
   server: "localhost", // SỬA: Phải là localhost hoặc 127.0.0.1
   database: "LibraryDB",
+  port: 1433,
   options: {
     encrypt: true,
     trustServerCertificate: true,
@@ -294,7 +295,84 @@ app.post("/api/insert/books", async (req, res) => {
     res.status(500).json({ error: "server_error", detail: err.message });
   }
 });
+// API 7: Lấy chi tiết giỏ hàng đang Active của User
+app.get("/api/cart/:userID", async (req, res) => {
+  try {
+    const { userID } = req.params;
+    const pool = await sql.connect(dbConfig);
+    const result = await pool
+      .request()
+      .input("UserID", sql.Char(8), userID)
+      .execute("sp_GetActiveCartDetails");
+    
+    // Xử lý trường hợp không có giỏ hàng (recordset rỗng hoặc chỉ chứa message)
+    if (result.recordset.length > 0 && result.recordset[0].Message) {
+        return res.status(200).json({ books: [], message: result.recordset[0].Message });
+    }
 
+    res.json({ books: result.recordset });
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// API 8: Thêm sách vào giỏ hàng
+app.post("/api/cart/add", async (req, res) => {
+  try {
+    const { userID, bookID } = req.body;
+    const pool = await sql.connect(dbConfig);
+    
+    await pool
+      .request()
+      .input("UserID", sql.Char(8), userID)
+      .input("BookID", sql.VarChar(10), bookID)
+      .execute("sp_AddToCart");
+
+    res.json({ message: "Đã thêm sách vào giỏ hàng." });
+  } catch (err) {
+    console.error("Lỗi thêm sách vào giỏ:", err.message);
+    res.status(500).send(err.message);
+  }
+});
+
+// API 9: Xóa sách khỏi giỏ hàng
+app.post("/api/cart/remove", async (req, res) => {
+  try {
+    const { userID, bookID } = req.body;
+    const pool = await sql.connect(dbConfig);
+    
+    await pool
+      .request()
+      .input("UserID", sql.Char(8), userID)
+      .input("BookID", sql.VarChar(10), bookID)
+      .execute("sp_RemoveFromCart");
+
+    res.json({ message: "Đã xóa sách khỏi giỏ hàng." });
+  } catch (err) {
+    console.error("Lỗi xóa sách khỏi giỏ:", err.message);
+    res.status(500).send(err.message);
+  }
+});
+
+// API 10: Thanh toán giỏ hàng (Checkout)
+app.post("/api/cart/checkout", async (req, res) => {
+  try {
+    const { borrowerID, handlerID } = req.body;
+    const pool = await sql.connect(dbConfig);
+    
+    // GỌI STORED PROCEDURE SP_CHECKOUTCART
+    const result = await pool
+      .request()
+      .input("BorrowerID", sql.Char(8), borrowerID)
+      .input("HandlerID", sql.Char(8), handlerID)
+      .execute("sp_CheckoutCart");
+
+    res.json(result.recordset[0]); // Trả về NewRecordID và Status/Message
+  } catch (err) {
+    console.error("Lỗi thanh toán giỏ hàng:", err.message);
+    res.status(500).send(err.message);
+  }
+});
 
 // Khởi chạy server
 app.listen(PORT, () => {

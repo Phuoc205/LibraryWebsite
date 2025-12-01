@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import BookCatalog from './Component/Books/BookCatalog';
 import BookManagement from './Component/Books/BookManagement';
 import CirculationDesk from './Component/Circulation/CirculationDesk';
+import CartContain from './Component/Cart/CartContain';
 import Header from './Component/header/header';
 import Footer from './Component/footer/footer'
 import Homepage from './Routes/hompage';
@@ -19,6 +20,7 @@ function App() {
             <Routes>
                 <Route path="/search" element={<BookCatalog />} />
                 <Route path="/manage-books" element={<BookManagement />} />
+                <Route path="/cart" element={<CartContain />} />
                 <Route path="/return" element={<CirculationDesk />} />
                 <Route path="/" element={<Homepage />} />
             </Routes>

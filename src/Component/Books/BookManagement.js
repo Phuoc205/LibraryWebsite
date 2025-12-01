@@ -41,12 +41,12 @@ const BookManagement = () => {
                 const result = await response.json();
                 console.log("JSON result:", result);
 
-                if (!response.ok) {
-                    alert("Lỗi khi thêm sách: " + result.error);
+                if (!response.ok || result.error) {
+                    alert("Lỗi khi thêm sách: " + (result.detail || result.error));
                     return;
                 }
 
-                alert("Đã thêm sách thành công!");
+                alert(`Đã thêm sách thành công! Mã RecordID mới: ${result.id}`);
                 setFormData({
                     title: "",
                     refBookID: "",
@@ -122,7 +122,7 @@ const BookManagement = () => {
 
                 {/* AUTHOR INFO */}
                 <div style={{ marginTop: "15px" }}>
-                    <label>Mã tác giả (AuthorID):</label>
+                    <label>Mã tác giả (AuthorID) (*):</label>
                     <input
                         name="authorID"
                         value={formData.authorID}
@@ -148,7 +148,7 @@ const BookManagement = () => {
                         <h3>Thông tin Tác giả mới</h3>
 
                         <div>
-                            <label>Tên tác giả:</label>
+                            <label>Tên tác giả (*):</label>
                             <input
                                 name="authorName"
                                 value={formData.authorName}
