@@ -972,7 +972,7 @@ GO
 
 -- sp_RemoveFromCart: Xóa sách khỏi giỏ hàng
 CREATE OR ALTER PROCEDURE sp_RemoveFromCart
-    @UserID CHAR(8),
+     @UserID CHAR(8),
     @BookID VARCHAR(10)
 AS
 BEGIN
