@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-
+import './BookManagement.css'
 const BookManagement = () => {
     const currentYear = new Date().getFullYear();
 
@@ -72,114 +72,68 @@ const BookManagement = () => {
 
 
     return (
-        <div style={{ padding: "20px", maxWidth: "600px", margin: "0 auto" }}>
-            <h2>Quản lý Hồ sơ Sách</h2>
+    <div className="book-form-container">
+        <h2>Quản lý Hồ sơ Sách</h2>
 
-            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+        <form onSubmit={handleSubmit} className="book-form">
+            {/* BOOK INFO */}
+            <div>
+                <label>Tựa đề:</label>
+                <input name="title" value={formData.title} onChange={handleChange} required />
+            </div>
+
+            <div>
+                <label>RefBookID (nếu có):</label>
+                <input name="refBookID" value={formData.refBookID} onChange={handleChange} />
+            </div>
+
+            <div>
+                <label>Nhà Xuất Bản:</label>
+                <input name="publisher" value={formData.publisher} onChange={handleChange} />
+            </div>
+
+            <div>
+                <label>Năm Xuất Bản:</label>
+                <input type="number" name="year" value={formData.year} onChange={handleChange} />
+            </div>
+
+            {/* AUTHOR INFO */}
+            <div>
+                <label>Mã tác giả (AuthorID) (*):</label>
+                <input name="authorID" value={formData.authorID} onChange={handleChange} required />
+            </div>
+
+            <label className="checkbox-label">
+                <input
+                    type="checkbox"
+                    name="addNewAuthor"
+                    checked={formData.addNewAuthor}
+                    onChange={handleChange}
+                />
+                Thêm tác giả mới?
                 
-                {/* BOOK INFO */}
-                <div>
-                    <label>Tựa đề:</label>
-                    <input
-                        name="title"
-                        value={formData.title}
-                        onChange={handleChange}
-                        required
-                        style={{ width: "100%", padding: "8px" }}
-                    />
-                </div>
+            </label>
 
-                <div>
-                    <label>RefBookID (nếu có):</label>
-                    <input
-                        name="refBookID"
-                        value={formData.refBookID}
-                        onChange={handleChange}
-                        style={{ width: "100%", padding: "8px" }}
-                    />
-                </div>
-
-                <div>
-                    <label>Nhà Xuất Bản:</label>
-                    <input
-                        name="publisher"
-                        value={formData.publisher}
-                        onChange={handleChange}
-                        style={{ width: "100%", padding: "8px" }}
-                    />
-                </div>
-
-                <div>
-                    <label>Năm Xuất Bản:</label>
-                    <input
-                        type="number"
-                        name="year"
-                        value={formData.year}
-                        onChange={handleChange}
-                        style={{ width: "100%", padding: "8px" }}
-                    />
-                </div>
-
-                {/* AUTHOR INFO */}
-                <div style={{ marginTop: "15px" }}>
-                    <label>Mã tác giả (AuthorID) (*):</label>
-                    <input
-                        name="authorID"
-                        value={formData.authorID}
-                        onChange={handleChange}
-                        required
-                        style={{ width: "100%", padding: "8px" }}
-                    />
-                </div>
-
-                <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
-                    <input
-                        type="checkbox"
-                        name="addNewAuthor"
-                        checked={formData.addNewAuthor}
-                        onChange={handleChange}
-                    />
-                    Thêm tác giả mới?
-                </label>
-
-                {/* SHOW THIS ONLY IF addNewAuthor = true */}
-                {formData.addNewAuthor && (
-                    <div style={{ padding: "15px", border: "1px solid #ccc", borderRadius: "5px" }}>
-                        <h3>Thông tin Tác giả mới</h3>
-
-                        <div>
-                            <label>Tên tác giả (*):</label>
-                            <input
-                                name="authorName"
-                                value={formData.authorName}
-                                onChange={handleChange}
-                                required={formData.addNewAuthor}
-                                style={{ width: "100%", padding: "8px" }}
-                            />
-                        </div>
-
-                        <div>
-                            <label>Tiểu sử (Bio):</label>
-                            <textarea
-                                name="authorBio"
-                                value={formData.authorBio}
-                                onChange={handleChange}
-                                required={formData.addNewAuthor}
-                                style={{ width: "100%", padding: "8px", height: "100px" }}
-                            />
-                        </div>
+            {/* SHOW THIS ONLY IF addNewAuthor = true */}
+            {formData.addNewAuthor && (
+                <div className="new-author-section">
+                    <h3>Thông tin Tác giả mới</h3>
+                    <div>
+                        <label>Tên tác giả (*):</label>
+                        <input name="authorName" value={formData.authorName} onChange={handleChange} required />
                     </div>
-                )}
 
-                <button
-                    type="submit"
-                    style={{ padding: "10px", backgroundColor: "#28a745", color: "white", border: "none", cursor: "pointer" }}
-                >
-                    Thêm Sách Mới
-                </button>
-            </form>
-        </div>
-    );
+                    <div>
+                        <label>Tiểu sử (Bio):</label>
+                        <textarea name="authorBio" value={formData.authorBio} onChange={handleChange} />
+                    </div>
+                </div>
+            )}
+
+            <button type="submit">Thêm Sách Mới</button>
+        </form>
+    </div>
+);
 };
 
 export default BookManagement;
