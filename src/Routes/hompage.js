@@ -19,7 +19,7 @@ const Homepage = () => {
             author: 'Hoàng Thủy E',
             publisher: 'NXB Kim Đồng',
             year: 2010,
-            cover: 'https://lh4.googleusercontent.com/proxy/sGzQRruxLVpyc8Y0pnaZNiZnXyKtOniAsszYem00yo3PRcaZCRkCVqUWYcJKKtbZmQcNaO_E7UJ7fLkL5XReHpCxqLpDqGAz_bj_D-KFpY8Xlc7Bl5ITr76OECvifxMOpQmd8U7KCZTfsSFtS44?w=500&q=80',
+            cover: 'https://bookfun.vn/wp-content/uploads/2024/09/de-men-phieu-luu-ky.jpg.webp',
         },
         {
             id: 'R001',
