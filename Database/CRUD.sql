@@ -1012,10 +1012,9 @@ BEGIN
     SET NOCOUNT ON;
     
     DECLARE @ActiveCartID VARCHAR(8);
-    DECLARE @MaxLoanNum INT;
-    DECLARE @NextLoanID VARCHAR(8);
-    DECLARE @MaxBooks INT = 3; 
-    
+    DECLARE @FailTitles NVARCHAR(MAX) = ''; 
+    DECLARE @UnavailableCount INT = 0;
+
     -- 1. Xác định Giỏ hàng Active
     SELECT @ActiveCartID = CartID 
     FROM Cart 
@@ -1026,33 +1025,47 @@ BEGIN
         RAISERROR(N'Lỗi: Người dùng không có giỏ hàng hoạt động.', 16, 1);
         RETURN;
     END
-    
-    -- 2. Kiểm tra giới hạn mượn sách
-    IF (SELECT COUNT(*) FROM [Cart Contain] WHERE CartID = @ActiveCartID) > @MaxBooks
+
+    -- 2. BƯỚC KIỂM TRA TRƯỚC (Pre-check)
+    -- Tìm tất cả các sách trong giỏ mà trạng thái thực tế KHÔNG phải là 'Available'
+    SELECT @FailTitles = @FailTitles + N'- ' + br.Title + ' (' + bc.BookID + N')' + CHAR(13),
+           @UnavailableCount = @UnavailableCount + 1
+    FROM [Cart Contain] cc
+    JOIN [Book Copy] bc ON cc.BookID = bc.BookID
+    JOIN BibliographicRecord br ON bc.RecordID = br.RecordID
+    WHERE cc.CartID = @ActiveCartID 
+      AND bc.[Status] <> 'Available'; -- Sách đã bị mượn, mất, hoặc bảo trì
+
+    -- 3. XỬ LÝ NẾU CÓ SÁCH KHÔNG HỢP LỆ
+    IF @UnavailableCount > 0
     BEGIN
-        RAISERROR(N'Lỗi: Giỏ hàng có quá nhiều sách. Giới hạn là %d cuốn.', 16, 1, @MaxBooks);
-        RETURN;
+        -- Chỉ xóa những cuốn sách không hợp lệ khỏi giỏ hàng
+        DELETE cc
+        FROM [Cart Contain] cc
+        JOIN [Book Copy] bc ON cc.BookID = bc.BookID
+        WHERE cc.CartID = @ActiveCartID 
+          AND bc.[Status] <> 'Available';
+
+        -- Trả về thông báo cảnh báo và KHÔNG tạo phiếu mượn nào
+        SELECT N'Rất tiếc, có ' + CAST(@UnavailableCount AS NVARCHAR) + N' cuốn sách vừa bị người khác mượn trước:' + CHAR(13) + 
+               @FailTitles + CHAR(13) +
+               N'Hệ thống đã xóa các cuốn này khỏi giỏ. Vui lòng kiểm tra và bấm "Xác nhận mượn" lại cho các cuốn còn lại.' AS Message, 
+               'warning' AS Status;
+        
+        RETURN; -- Dừng chương trình tại đây
     END
 
-    -- 3. Kiểm tra UserID Handler
-    IF NOT EXISTS (SELECT 1 FROM [User] WHERE UserID = @HandlerID AND UserType IN ('Librarian', 'Admin'))
-    BEGIN
-        RAISERROR(N'Lỗi: Handler ID không hợp lệ hoặc không có quyền.', 16, 1);
-        RETURN;
-    END
-
-    -- 4. Bắt đầu Giao dịch
+    -- 4. NẾU TẤT CẢ ĐỀU HỢP LỆ -> TIẾN HÀNH TẠO PHIẾU MƯỢN (Transaction)
     BEGIN TRANSACTION;
     BEGIN TRY
-        -- Lấy số ID lớn nhất hiện tại trong bảng Loan
-        SELECT @MaxLoanNum = ISNULL(MAX(TRY_CAST(SUBSTRING(LoanID, 2, LEN(LoanID) - 1) AS INT)), 0)
-        FROM Loan;
+        DECLARE @MaxLoanNum INT;
+        DECLARE @NextLoanID VARCHAR(8);
 
-        -- Khai báo CURSOR để duyệt qua từng sách trong giỏ
+        SELECT @MaxLoanNum = ISNULL(MAX(TRY_CAST(SUBSTRING(LoanID, 2, LEN(LoanID) - 1) AS INT)), 0) FROM Loan;
+
+        -- Duyệt qua giỏ hàng để tạo Loan
         DECLARE cur_CartItems CURSOR FOR
-        SELECT BookID
-        FROM [Cart Contain] 
-        WHERE CartID = @ActiveCartID;
+        SELECT BookID FROM [Cart Contain] WHERE CartID = @ActiveCartID;
 
         OPEN cur_CartItems;
         DECLARE @CurrentBookID VARCHAR(10);
@@ -1061,11 +1074,9 @@ BEGIN
 
         WHILE @@FETCH_STATUS = 0
         BEGIN
-            -- Tạo LoanID mới cho từng sách
             SET @MaxLoanNum = @MaxLoanNum + 1;
             SET @NextLoanID = 'L' + RIGHT('00' + CAST(@MaxLoanNum AS VARCHAR(5)), 3);
 
-            -- INSERT vào bảng Loan (Mặc định mượn 14 ngày)
             INSERT INTO Loan (LoanID, LoanDate, [Due Date], [Status], [Handler ID], BorrowerID, BookID)
             VALUES (@NextLoanID, GETDATE(), DATEADD(DAY, 14, GETDATE()), 'OnLoan', @HandlerID, @BorrowerID, @CurrentBookID);
             
@@ -1075,24 +1086,20 @@ BEGIN
         CLOSE cur_CartItems;
         DEALLOCATE cur_CartItems;
         
-        -- 5. Cập nhật trạng thái Giỏ hàng thành Completed
-        UPDATE Cart
-        SET [Status] = 'Completed'
-        WHERE CartID = @ActiveCartID;
+        -- Cập nhật giỏ hàng thành hoàn tất
+        UPDATE Cart SET [Status] = 'Completed' WHERE CartID = @ActiveCartID;
         
-        -- 6. Dọn dẹp Cart Contain 
-        DELETE FROM [Cart Contain] WHERE CartID = @ActiveCartID;
-
         COMMIT TRANSACTION;
-        SELECT N'Thanh toán giỏ hàng thành công! Đã tạo phiếu mượn.' AS Message, 'success' AS Status;
+
+        SELECT N'Thanh toán thành công! Đã tạo phiếu mượn cho tất cả sách.' AS Message, 'success' AS Status;
+
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        IF CURSOR_STATUS('global','cur_CartItems') >= -1 BEGIN CLOSE cur_CartItems; DEALLOCATE cur_CartItems; END
         
-        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
-        RAISERROR(N'Lỗi trong quá trình thanh toán: %s', 16, 1, @ErrorMessage);
-        RETURN;
+        DECLARE @Err NVARCHAR(4000) = ERROR_MESSAGE();
+        RAISERROR(N'Lỗi hệ thống: %s', 16, 1, @Err);
     END CATCH
 END;
 GO
