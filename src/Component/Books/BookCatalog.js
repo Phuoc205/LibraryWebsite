@@ -648,10 +648,10 @@ const BookCatalog = () => {
 
   // --- STATE PHÂN TRANG ---
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5; 
+  const itemsPerPage = 5;
 
   // --- HARDCODE USERID CHO CHỨC NĂNG GIỎ HÀNG (SINH VIÊN HOÀNG - U0000005) ---
-  const USER_ID = 'U0000005'; 
+  const USER_ID = "U0000005";
 
   // --- 1. INITIAL LOAD (Chỉ chạy 1 lần) ---
   useEffect(() => {
@@ -669,7 +669,11 @@ const BookCatalog = () => {
   useEffect(() => {
     if (!isFilterOpen) return;
     const handleClickOutside = (event) => {
-      if (filterRef.current && event.target && filterRef.current.contains(event.target)) {
+      if (
+        filterRef.current &&
+        event.target &&
+        filterRef.current.contains(event.target)
+      ) {
         return;
       }
       setIsFilterOpen(false);
@@ -687,7 +691,7 @@ const BookCatalog = () => {
       if (!response.ok) throw new Error("Lỗi kết nối");
       const data = await response.json();
       setBooks(data);
-      setCurrentPage(1); 
+      setCurrentPage(1);
     } catch (error) {
       console.error("Lỗi:", error);
     }
@@ -711,7 +715,7 @@ const BookCatalog = () => {
       const res = await fetch(url);
       const data = await res.json();
       setBooks(data);
-      setCurrentPage(1); 
+      setCurrentPage(1);
     } catch (err) {
       console.error(err);
     }
@@ -758,12 +762,12 @@ const BookCatalog = () => {
         return 0;
       });
     }
-    return sortableItems; 
+    return sortableItems;
   }, [books, sortConfig]);
 
   const indexOfLastItem = currentPage * itemsPerPage;
   // SỬA LỖI: Thay thế lastIndex bằng indexOfLastItem
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage; 
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentBooks = sortedBooks.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(sortedBooks.length / itemsPerPage);
 
@@ -826,49 +830,28 @@ const BookCatalog = () => {
   };
 
   // --- LOGIC GIỎ HÀNG (ĐÃ SỬA VÀ TỐI ƯU) ---
-  const handleAddToCart = async (book) => {
-    
-    // 1. Kiểm tra số lượng bản sao khả dụng
-    if (book.AvailableCopies === 0 || !book.AvailableBookIDs) {
-        alert("Sách này hiện đã hết bản sao sẵn có.");
-        return;
-    }
-    
-    // 2. Tách chuỗi BookID và lấy mã bản sao đầu tiên
-    const availableIDs = book.AvailableBookIDs;
-    
-    // Tách chuỗi (ví dụ: "C002,C024" -> ["C002", "C024"]) và lấy phần tử đầu tiên
-    const bookIDToAdd = availableIDs.split(',')[0].trim(); 
-
-    if (!window.confirm(`Thêm bản sao ${bookIDToAdd} của sách "${book.Title}" vào giỏ hàng?`)) {
-        return;
-    }
-
+  const handleAddToCart = async (recordID) => {
     try {
-        const response = await fetch("http://localhost:5000/api/cart/add", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userID: USER_ID, bookID: bookIDToAdd })
-        });
+      const response = await fetch("http://localhost:5000/api/cart/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // GỬI CHÍNH XÁC "recordID"
+        body: JSON.stringify({ userID: USER_ID, recordID: recordID }),
+      });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            alert("Lỗi thêm vào giỏ: " + errorText); 
-            return;
-        }
-
-        alert(`Đã thêm sách ${bookIDToAdd} vào giỏ hàng!`);
-        
-        // Refresh Catalog để cập nhật số lượng AvailableCopies
+      const result = await response.json();
+      if (!response.ok) {
+        alert("Lỗi: " + (result.error || result.message));
+      } else {
+        alert("Đã thêm vào giỏ hàng!");
+        // Refresh lại để cập nhật số lượng
         if (currentFilter) handleFilterByCategory(currentFilter);
         else fetchBooks(keyword);
-
+      }
     } catch (err) {
-        console.error(err);
-        alert("Lỗi kết nối tới server!");
+      alert("Lỗi kết nối server");
     }
   };
-
 
   return (
     <>
@@ -957,7 +940,9 @@ const BookCatalog = () => {
             <thead>
               <tr>
                 <th onClick={() => requestSort("RecordID")}>
-                  <div className="sort-header">Mã TB {getSortIcon("RecordID")}</div>
+                  <div className="sort-header">
+                    Mã TB {getSortIcon("RecordID")}
+                  </div>
                 </th>
                 <th onClick={() => requestSort("Title")}>
                   <div className="sort-header">
@@ -1027,15 +1012,18 @@ const BookCatalog = () => {
                         {/* NÚT THÊM VÀO GIỎ HÀNG (MỚI) */}
                         <button
                           className="btn-icon btn-icon-cart"
-                          onClick={() => handleAddToCart(book)}
-                          title={book.AvailableCopies > 0 ? "Thêm vào giỏ hàng (Lấy BookID đầu tiên)" : "Đã hết bản sao"}
+                          onClick={() => handleAddToCart(book.RecordID)}
                           disabled={book.AvailableCopies === 0}
+                          title="Thêm vào giỏ"
                         >
-                            <Icons.CartAdd />
+                          <Icons.CartAdd />
                         </button>
                         <button
                           className="btn-icon btn-icon-edit"
-                          onClick={() => handleEditClick(book)}
+                          onClick={() => {
+                            setCurrentBook(book);
+                            setIsModalOpen(true);
+                          }}
                           title="Sửa"
                         >
                           <Icons.Edit />
