@@ -191,7 +191,7 @@ h2 {
     padding: 15px; 
     text-align: left; 
     border-bottom: 2px solid #eee;
-    cursor: pointer; /* Cho phép click để sort */
+    cursor: pointer; 
     user-select: none;
     transition: background-color 0.2s;
   }
@@ -224,6 +224,11 @@ h2 {
   .btn-icon-edit:hover { background: var(--warning-color); color: white; }
   .btn-icon-delete { background: rgba(239, 35, 60, 0.15); color: var(--danger-color); }
   .btn-icon-delete:hover { background: var(--danger-color); color: white; }
+  /* NEW CART ICON STYLE */
+  .btn-icon-cart { background: rgba(0, 123, 255, 0.15); color: #007bff; }
+  .btn-icon-cart:hover:not(:disabled) { background: #007bff; color: white; }
+  .btn-icon-cart:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* --- PAGINATION (NEW) --- */
 .pagination-wrapper {
   display: flex;
@@ -439,7 +444,6 @@ const Icons = {
       <path d="M5 12l7-7 7 7" />
     </svg>
   ),
-  // Icon mũi tên xuống
   SortDesc: () => (
     <svg
       width="12"
@@ -455,7 +459,6 @@ const Icons = {
       <path d="M19 12l-7 7-7-7" />
     </svg>
   ),
-  // Icon mặc định (2 chiều mờ)
   SortDefault: () => (
     <svg
       width="12"
@@ -497,6 +500,25 @@ const Icons = {
       strokeLinejoin="round"
     >
       <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  ),
+  // Icon cho nút Thêm vào giỏ hàng (MỚI)
+  CartAdd: () => (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="9" cy="21" r="1"></circle>
+      <circle cx="20" cy="21" r="1"></circle>
+      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+      <path d="M12 9v6"></path>
+      <path d="M9 12h6"></path>
     </svg>
   ),
 };
@@ -624,9 +646,12 @@ const BookCatalog = () => {
     direction: "ascending",
   });
 
-  // --- STATE PHÂN TRANG (MỚI) ---
+  // --- STATE PHÂN TRANG ---
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5; // Số sách mỗi trang
+  const itemsPerPage = 5; 
+
+  // --- HARDCODE USERID CHO CHỨC NĂNG GIỎ HÀNG (SINH VIÊN HOÀNG - U0000005) ---
+  const USER_ID = 'U0000005'; 
 
   // --- 1. INITIAL LOAD (Chỉ chạy 1 lần) ---
   useEffect(() => {
@@ -644,7 +669,7 @@ const BookCatalog = () => {
   useEffect(() => {
     if (!isFilterOpen) return;
     const handleClickOutside = (event) => {
-      if (filterRef.current && filterRef.current.contains(event.target)) {
+      if (filterRef.current && event.target && filterRef.current.contains(event.target)) {
         return;
       }
       setIsFilterOpen(false);
@@ -662,7 +687,7 @@ const BookCatalog = () => {
       if (!response.ok) throw new Error("Lỗi kết nối");
       const data = await response.json();
       setBooks(data);
-      setCurrentPage(1); // Reset về trang 1 khi tìm kiếm mới
+      setCurrentPage(1); 
     } catch (error) {
       console.error("Lỗi:", error);
     }
@@ -686,7 +711,7 @@ const BookCatalog = () => {
       const res = await fetch(url);
       const data = await res.json();
       setBooks(data);
-      setCurrentPage(1); // Reset về trang 1 khi lọc
+      setCurrentPage(1); 
     } catch (err) {
       console.error(err);
     }
@@ -710,14 +735,13 @@ const BookCatalog = () => {
 
   // Tính toán danh sách đã sắp xếp
   const sortedBooks = useMemo(() => {
-    // Tạo bản sao để sort
     let sortableItems = [...books];
     if (sortConfig.key !== null) {
       sortableItems.sort((a, b) => {
         let aValue = a[sortConfig.key];
         let bValue = b[sortConfig.key];
 
-        if (sortConfig.key === "AvailableCopies") {
+        if (sortConfig.key === "AvailableCopies" || sortConfig.key === "Year") {
           aValue = Number(aValue);
           bValue = Number(bValue);
         } else {
@@ -734,11 +758,12 @@ const BookCatalog = () => {
         return 0;
       });
     }
-    return sortableItems; // Danh sách đã được sắp xếp (Full list)
+    return sortableItems; 
   }, [books, sortConfig]);
 
   const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  // SỬA LỖI: Thay thế lastIndex bằng indexOfLastItem
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage; 
   const currentBooks = sortedBooks.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(sortedBooks.length / itemsPerPage);
 
@@ -777,7 +802,6 @@ const BookCatalog = () => {
       alert("Cập nhật thành công!");
       setIsModalOpen(false);
 
-      // Refresh dữ liệu
       if (currentFilter) handleFilterByCategory(currentFilter);
       else fetchBooks(keyword);
     } catch (error) {
@@ -800,6 +824,51 @@ const BookCatalog = () => {
       }
     }
   };
+
+  // --- LOGIC GIỎ HÀNG (ĐÃ SỬA VÀ TỐI ƯU) ---
+  const handleAddToCart = async (book) => {
+    
+    // 1. Kiểm tra số lượng bản sao khả dụng
+    if (book.AvailableCopies === 0 || !book.AvailableBookIDs) {
+        alert("Sách này hiện đã hết bản sao sẵn có.");
+        return;
+    }
+    
+    // 2. Tách chuỗi BookID và lấy mã bản sao đầu tiên
+    const availableIDs = book.AvailableBookIDs;
+    
+    // Tách chuỗi (ví dụ: "C002,C024" -> ["C002", "C024"]) và lấy phần tử đầu tiên
+    const bookIDToAdd = availableIDs.split(',')[0].trim(); 
+
+    if (!window.confirm(`Thêm bản sao ${bookIDToAdd} của sách "${book.Title}" vào giỏ hàng?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch("http://localhost:5000/api/cart/add", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userID: USER_ID, bookID: bookIDToAdd })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            alert("Lỗi thêm vào giỏ: " + errorText); 
+            return;
+        }
+
+        alert(`Đã thêm sách ${bookIDToAdd} vào giỏ hàng!`);
+        
+        // Refresh Catalog để cập nhật số lượng AvailableCopies
+        if (currentFilter) handleFilterByCategory(currentFilter);
+        else fetchBooks(keyword);
+
+    } catch (err) {
+        console.error(err);
+        alert("Lỗi kết nối tới server!");
+    }
+  };
+
 
   return (
     <>
@@ -888,20 +957,20 @@ const BookCatalog = () => {
             <thead>
               <tr>
                 <th onClick={() => requestSort("RecordID")}>
-                  <div class="sort-header">Mã TB {getSortIcon("RecordID")}</div>
+                  <div className="sort-header">Mã TB {getSortIcon("RecordID")}</div>
                 </th>
                 <th onClick={() => requestSort("Title")}>
-                  <div class="sort-header">
+                  <div className="sort-header">
                     Thông tin Sách {getSortIcon("Title")}
                   </div>
                 </th>
                 <th onClick={() => requestSort("AuthorName")}>
-                  <div class="sort-header">
+                  <div className="sort-header">
                     Tác giả / NXB {getSortIcon("AuthorName")}
                   </div>
                 </th>
                 <th onClick={() => requestSort("AvailableCopies")}>
-                  <div class="sort-header">
+                  <div className="sort-header">
                     Trạng thái {getSortIcon("AvailableCopies")}
                   </div>
                 </th>
@@ -923,7 +992,6 @@ const BookCatalog = () => {
                   </td>
                 </tr>
               ) : (
-                // LƯU Ý: Dùng currentBooks thay vì books
                 currentBooks.map((book) => (
                   <tr key={book.RecordID}>
                     <td style={{ fontWeight: "bold" }}>{book.RecordID}</td>
@@ -956,6 +1024,15 @@ const BookCatalog = () => {
                     </td>
                     <td>
                       <div className="actions-cell">
+                        {/* NÚT THÊM VÀO GIỎ HÀNG (MỚI) */}
+                        <button
+                          className="btn-icon btn-icon-cart"
+                          onClick={() => handleAddToCart(book)}
+                          title={book.AvailableCopies > 0 ? "Thêm vào giỏ hàng (Lấy BookID đầu tiên)" : "Đã hết bản sao"}
+                          disabled={book.AvailableCopies === 0}
+                        >
+                            <Icons.CartAdd />
+                        </button>
                         <button
                           className="btn-icon btn-icon-edit"
                           onClick={() => handleEditClick(book)}
@@ -979,7 +1056,7 @@ const BookCatalog = () => {
           </table>
         </div>
 
-        {/* --- PAGINATION CONTROLS (MỚI) --- */}
+        {/* --- PAGINATION CONTROLS --- */}
         {sortedBooks.length > 0 && (
           <div className="pagination-wrapper">
             <button
@@ -991,7 +1068,6 @@ const BookCatalog = () => {
               <Icons.ChevronLeft />
             </button>
 
-            {/* Tạo mảng số trang để render */}
             {Array.from({ length: totalPages }, (_, i) => (
               <button
                 key={i + 1}
@@ -1015,7 +1091,7 @@ const BookCatalog = () => {
 
         <EditBookModal
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
+          onClose={() => setIsModalModal(false)}
           book={currentBook}
           onSave={handleSaveUpdate}
         />

@@ -498,34 +498,43 @@ GO
 
 -- sp_SearchBookByTitle
 CREATE OR ALTER PROCEDURE sp_SearchBookByTitle
-    @Keyword NVARCHAR(100)
+    @Keyword NVARCHAR(100)
 AS
 BEGIN
-    SELECT 
-        br.RecordID,
-        br.Title,
-        br.Publisher,
-        br.[Year],
-        -- Sử dụng STRING_AGG để gom tất cả tên tác giả thành một chuỗi duy nhất
-        (
-            SELECT STRING_AGG(a.Fullname, N', ')
-            FROM Viet v 
-            JOIN Author a ON v.AuthorID = a.SSN
-            WHERE v.RecordID = br.RecordID
-        ) AS AuthorName,
-        -- Tính số lượng bản sao khả dụng
-        COUNT(CASE WHEN bc.[Status] = 'Available' THEN 1 END) AS AvailableCopies
-    FROM BibliographicRecord br
-    -- Bỏ LEFT JOIN Viet/Author ở cấp ngoài
-    LEFT JOIN [Book Copy] bc ON br.RecordID = bc.RecordID
-    WHERE br.Title LIKE N'%' + @Keyword + N'%'
-    -- Chỉ GROUP BY các thông tin của BibliographicRecord
-    GROUP BY 
-        br.RecordID,
-        br.Title,
-        br.Publisher,
-        br.[Year]
-    ORDER BY br.Title ASC;
+    SET NOCOUNT ON;
+    
+    SELECT 
+        br.RecordID,
+        br.Title,
+        br.Publisher,
+        br.[Year],
+        
+        -- 1. Liệt kê tên Tác giả
+        (
+            SELECT STRING_AGG(a.Fullname, N', ')
+            FROM Viet v 
+            JOIN Author a ON v.AuthorID = a.SSN
+            WHERE v.RecordID = br.RecordID
+        ) AS AuthorName,
+        
+        -- 2. Tính số lượng bản sao khả dụng
+        COUNT(CASE WHEN bc.[Status] = 'Available' THEN 1 END) AS AvailableCopies,
+        
+        -- 3. LIỆT KÊ TẤT CẢ CÁC BOOKID ĐANG CÓ (Status = 'Available')
+        (
+            SELECT STRING_AGG(bc_avail.BookID, ', ')
+            FROM [Book Copy] bc_avail
+            WHERE bc_avail.RecordID = br.RecordID
+              AND bc_avail.[Status] = 'Available'
+        ) AS AvailableBookIDs
+        
+    FROM BibliographicRecord br
+    LEFT JOIN [Book Copy] bc ON br.RecordID = bc.RecordID
+    WHERE br.Title LIKE N'%' + @Keyword + N'%'
+    
+    GROUP BY 
+        br.RecordID, br.Title, br.Publisher, br.[Year]
+    ORDER BY br.Title ASC;
 END;
 GO
 
@@ -807,78 +816,283 @@ BEGIN
     END CATCH
 END;
 GO
-
--- procedure insertbibliographicRecord
+-- sp_InsertBibliographicRecord: Thêm tài liệu thư mục và Tác giả
 CREATE PROCEDURE sp_InsertBibliographicRecord
-    @Title        NVARCHAR(200),
-    @RefBookID    VARCHAR(10) = NULL,
-    @Publisher    NVARCHAR(100),
-    @Year         INT,
-    @AuthorName   NVARCHAR(100),
-    @AuthorID     VARCHAR(10),
-    @AuthorBio    NVARCHAR(MAX)
+    @Title        NVARCHAR(200),
+    @RefBookID    VARCHAR(10) = NULL,
+    @Publisher    NVARCHAR(100),
+    @Year         INT,
+    @AuthorName   NVARCHAR(100),
+    @AuthorID     VARCHAR(10),
+    @AuthorBio    NVARCHAR(MAX)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @NextID VARCHAR(10);
+    DECLARE @MaxNum INT;
+
+    IF (@Year < 0 OR @Year > YEAR(GETDATE()))
+    BEGIN
+        SELECT 'Invalid year' AS Error;
+        RETURN;
+    END
+
+    IF LEN(LTRIM(RTRIM(@Title))) = 0
+    BEGIN
+        SELECT 'Title cannot be empty' AS Error;
+        RETURN;
+    END
+
+    IF (@RefBookID IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM BibliographicRecord WHERE RecordID = @RefBookID
+    ))
+    BEGIN
+        SELECT 'RefBookID does not exist' AS Error;
+        RETURN;
+    END
+
+    SELECT @MaxNum = MAX(
+        TRY_CAST(SUBSTRING(RecordID, 2, LEN(RecordID)) AS INT)
+    )
+    FROM BibliographicRecord;
+
+    SET @MaxNum = ISNULL(@MaxNum, 0);
+    -- Logic tạo ID mới (R001, R002, ...)
+    IF @MaxNum < 999
+        SET @NextID = 'R' + RIGHT('00' + CAST(@MaxNum + 1 AS VARCHAR(3)), 3);
+    ELSE
+        SET @NextID = 'R' + RIGHT('000' + CAST(@MaxNum + 1 AS VARCHAR(4)), 4);
+
+
+    BEGIN TRY
+        INSERT INTO BibliographicRecord(RecordID, Title, RefBookID, Publisher, [Year])
+        VALUES (@NextID, @Title, @RefBookID, @Publisher, @Year);
+
+        IF NOT EXISTS (SELECT 1 FROM Author WHERE SSN = @AuthorID)
+        BEGIN
+            INSERT INTO Author(SSN, Fullname, Biography)
+            VALUES (@AuthorID, @AuthorName, @AuthorBio);
+        END
+
+        INSERT INTO Viet (AuthorID, RecordID)
+        VALUES (@AuthorID, @NextID);
+
+        SELECT @NextID AS NewRecordID, 'success' AS Status;
+
+    END TRY
+    BEGIN CATCH
+        SELECT ERROR_MESSAGE() AS Error;
+    END CATCH
+END
+GO
+
+--- sp_GetActiveCartDetails: Lấy chi tiết sách trong giỏ hàng đang Active
+CREATE OR ALTER PROCEDURE sp_GetActiveCartDetails
+    @UserID CHAR(8)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @ActiveCartID VARCHAR(8);
+    SELECT @ActiveCartID = CartID 
+    FROM Cart 
+    WHERE UserID = @UserID AND [Status] = 'Active';
+
+    IF @ActiveCartID IS NULL
+    BEGIN
+        SELECT N'Không tìm thấy giỏ hàng hoạt động.' AS Message, NULL AS CartID, 0 AS BookCount;
+        RETURN;
+    END
+
+    SELECT
+        cc.CartID,
+        bc.BookID,
+        br.Title,
+        b.[Branch Name] AS BranchName,
+        bc.[Status] AS BookStatus,
+        (
+            SELECT STRING_AGG(a.Fullname, N', ')
+            FROM Viet v 
+            JOIN Author a ON v.AuthorID = a.SSN
+            WHERE v.RecordID = bc.RecordID
+        ) AS AuthorName
+    FROM [Cart Contain] cc
+    JOIN [Book Copy] bc ON cc.BookID = bc.BookID
+    JOIN BibliographicRecord br ON bc.RecordID = br.RecordID
+    JOIN Branch b ON bc.[Branch ID] = b.[Branch ID]
+    WHERE cc.CartID = @ActiveCartID;
+END;
+GO
+
+-- sp_AddToCart: Thêm sách vào giỏ hàng
+CREATE OR ALTER PROCEDURE sp_AddToCart
+    @UserID CHAR(8),
+    @BookID VARCHAR(10)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @ActiveCartID VARCHAR(8);
+
+    SELECT @ActiveCartID = CartID 
+    FROM Cart 
+    WHERE UserID = @UserID AND [Status] = 'Active';
+
+    IF @ActiveCartID IS NULL
+    BEGIN
+        DECLARE @MaxNum INT;
+        SELECT @MaxNum = ISNULL(MAX(TRY_CAST(SUBSTRING(CartID, 3, LEN(CartID) - 2) AS INT)), 0)
+        FROM Cart;
+        SET @ActiveCartID = 'CT' + RIGHT('00' + CAST(@MaxNum + 1 AS VARCHAR(3)), 3);
+
+        INSERT INTO Cart (CartID, InitialDate, [Status], UserID)
+        VALUES (@ActiveCartID, GETDATE(), 'Active', @UserID);
+    END
+    
+    IF EXISTS (SELECT 1 FROM [Cart Contain] WHERE CartID = @ActiveCartID AND BookID = @BookID)
+    BEGIN
+        RAISERROR(N'Sách này đã có trong giỏ hàng.', 16, 1);
+        RETURN;
+    END
+
+    BEGIN TRY
+        -- Trigger trg_CheckCartItemAvailable sẽ kiểm tra sách có Available không
+        INSERT INTO [Cart Contain] (CartID, BookID)
+        VALUES (@ActiveCartID, @BookID);
+
+        PRINT N'Thêm sách vào giỏ hàng thành công.';
+    END TRY
+    BEGIN CATCH
+        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+        RAISERROR(@ErrorMessage, 16, 1);
+        RETURN;
+    END CATCH
+END;
+GO
+
+-- sp_RemoveFromCart: Xóa sách khỏi giỏ hàng
+CREATE OR ALTER PROCEDURE sp_RemoveFromCart
+    @UserID CHAR(8),
+    @BookID VARCHAR(10)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @ActiveCartID VARCHAR(8);
+
+    SELECT @ActiveCartID = CartID 
+    FROM Cart 
+    WHERE UserID = @UserID AND [Status] = 'Active';
+
+    IF @ActiveCartID IS NULL
+    BEGIN
+        RAISERROR(N'Không tìm thấy giỏ hàng hoạt động.', 16, 1);
+        RETURN;
+    END
+
+    DELETE FROM [Cart Contain]
+    WHERE CartID = @ActiveCartID AND BookID = @BookID;
+
+    IF @@ROWCOUNT = 0
+    BEGIN
+        RAISERROR(N'Không tìm thấy sách trong giỏ hàng.', 16, 1);
+    END
+    ELSE
+    BEGIN
+        PRINT N'Xóa sách khỏi giỏ hàng thành công.';
+    END
+END;
+GO
+
+-- sp_CheckoutCart: Chuyển giỏ hàng thành Phiếu Mượn (Loan)
+CREATE OR ALTER PROCEDURE sp_CheckoutCart
+    @BorrowerID CHAR(8),
+    @HandlerID CHAR(8)
 AS
 BEGIN
     SET NOCOUNT ON;
+    
+    DECLARE @ActiveCartID VARCHAR(8);
+    DECLARE @MaxLoanNum INT;
+    DECLARE @NextLoanID VARCHAR(8);
+    DECLARE @MaxBooks INT = 3; 
+    
+    -- 1. Xác định Giỏ hàng Active
+    SELECT @ActiveCartID = CartID 
+    FROM Cart 
+    WHERE UserID = @BorrowerID AND [Status] = 'Active';
 
-    DECLARE @NextID VARCHAR(10);
-    DECLARE @MaxID VARCHAR(10);
-    DECLARE @NumPart INT;
-
-    -- Validate Year
-    IF (@Year < 0 OR @Year > YEAR(GETDATE()))
+    IF @ActiveCartID IS NULL
     BEGIN
-        SELECT 'Invalid year' AS Error;
+        RAISERROR(N'Lỗi: Người dùng không có giỏ hàng hoạt động.', 16, 1);
+        RETURN;
+    END
+    
+    -- 2. Kiểm tra giới hạn mượn sách
+    IF (SELECT COUNT(*) FROM [Cart Contain] WHERE CartID = @ActiveCartID) > @MaxBooks
+    BEGIN
+        RAISERROR(N'Lỗi: Giỏ hàng có quá nhiều sách. Giới hạn là %d cuốn.', 16, 1, @MaxBooks);
         RETURN;
     END
 
-    -- Validate Title
-    IF LEN(LTRIM(RTRIM(@Title))) = 0
+    -- 3. Kiểm tra UserID Handler
+    IF NOT EXISTS (SELECT 1 FROM [User] WHERE UserID = @HandlerID AND UserType IN ('Librarian', 'Admin'))
     BEGIN
-        SELECT 'Title cannot be empty' AS Error;
+        RAISERROR(N'Lỗi: Handler ID không hợp lệ hoặc không có quyền.', 16, 1);
         RETURN;
     END
 
-    -- RefBookID validation
-    IF (@RefBookID IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM BibliographicRecord WHERE RecordID = @RefBookID
-    ))
-    BEGIN
-        SELECT 'RefBookID does not exist' AS Error;
-        RETURN;
-    END
-
-    DECLARE @MaxNum INT;
-
-    SELECT @MaxNum = MAX(
-        TRY_CAST(SUBSTRING(RecordID, 2, LEN(RecordID)) AS INT)
-    )
-    FROM BibliographicRecord;
-
-    SET @MaxNum = ISNULL(@MaxNum, 0);
-    IF @MaxNum < 999
-        SET @NextID = 'R' + RIGHT('000' + CAST(@MaxNum + 1 AS VARCHAR(3)), 3);
-    ELSE
-        SET @NextID = 'R' + RIGHT('0000' + CAST(@MaxNum + 1 AS VARCHAR(4)), 4);
-
-
+    -- 4. Bắt đầu Giao dịch
+    BEGIN TRANSACTION;
     BEGIN TRY
-        INSERT INTO BibliographicRecord(RecordID, Title, RefBookID, Publisher, [Year])
-        VALUES (@NextID, @Title, @RefBookID, @Publisher, @Year);
+        -- Lấy số ID lớn nhất hiện tại trong bảng Loan
+        SELECT @MaxLoanNum = ISNULL(MAX(TRY_CAST(SUBSTRING(LoanID, 2, LEN(LoanID) - 1) AS INT)), 0)
+        FROM Loan;
 
-        IF NOT EXISTS (SELECT 1 FROM Author WHERE SSN = @AuthorID)
+        -- Khai báo CURSOR để duyệt qua từng sách trong giỏ
+        DECLARE cur_CartItems CURSOR FOR
+        SELECT BookID
+        FROM [Cart Contain] 
+        WHERE CartID = @ActiveCartID;
+
+        OPEN cur_CartItems;
+        DECLARE @CurrentBookID VARCHAR(10);
+        
+        FETCH NEXT FROM cur_CartItems INTO @CurrentBookID;
+
+        WHILE @@FETCH_STATUS = 0
         BEGIN
-            INSERT INTO Author(SSN, Fullname, Biography)
-            VALUES (@AuthorID, @AuthorName, @AuthorBio);
+            -- Tạo LoanID mới cho từng sách
+            SET @MaxLoanNum = @MaxLoanNum + 1;
+            SET @NextLoanID = 'L' + RIGHT('00' + CAST(@MaxLoanNum AS VARCHAR(5)), 3);
+
+            -- INSERT vào bảng Loan (Mặc định mượn 14 ngày)
+            INSERT INTO Loan (LoanID, LoanDate, [Due Date], [Status], [Handler ID], BorrowerID, BookID)
+            VALUES (@NextLoanID, GETDATE(), DATEADD(DAY, 14, GETDATE()), 'OnLoan', @HandlerID, @BorrowerID, @CurrentBookID);
+            
+            FETCH NEXT FROM cur_CartItems INTO @CurrentBookID;
         END
 
-        INSERT INTO Viet (AuthorID, RecordID)
-        VALUES (@AuthorID, @NextID);
+        CLOSE cur_CartItems;
+        DEALLOCATE cur_CartItems;
+        
+        -- 5. Cập nhật trạng thái Giỏ hàng thành Completed
+        UPDATE Cart
+        SET [Status] = 'Completed'
+        WHERE CartID = @ActiveCartID;
+        
+        -- 6. Dọn dẹp Cart Contain 
+        DELETE FROM [Cart Contain] WHERE CartID = @ActiveCartID;
 
-        SELECT @NextID AS NewRecordID, 'success' AS Status;
-
+        COMMIT TRANSACTION;
+        SELECT N'Thanh toán giỏ hàng thành công! Đã tạo phiếu mượn.' AS Message, 'success' AS Status;
     END TRY
     BEGIN CATCH
-        SELECT ERROR_MESSAGE() AS Error;
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        
+        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+        RAISERROR(N'Lỗi trong quá trình thanh toán: %s', 16, 1, @ErrorMessage);
+        RETURN;
     END CATCH
-END
+END;
+GO
