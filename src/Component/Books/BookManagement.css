@@ -1,0 +1,84 @@
+.book-form-container {
+    max-width: 600px;
+    margin: 40px auto;
+    padding: 30px;
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.book-form-container h2 {
+    text-align: center;
+    margin-bottom: 25px;
+    color: #333;
+}
+
+.book-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.book-form label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 5px;
+    color: #555;
+}
+
+.book-form input[type="text"],
+.book-form input[type="number"],
+.book-form textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.book-form input[type="text"]:focus,
+.book-form input[type="number"]:focus,
+.book-form textarea:focus {
+    outline: none;
+    border-color: #28a745;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    justify-content: row;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: 500;
+    color: #555;
+}
+
+.new-author-section {
+    padding: 20px;
+    border: 1px solid #d1d1d1;
+    border-radius: 8px;
+    background-color: #fff;
+}
+
+.new-author-section h3 {
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.book-form button {
+    padding: 12px;
+    background-color: #28a745;
+    color: #fff;
+    border: none;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.book-form button:hover {
+    background-color: #218838;
+}

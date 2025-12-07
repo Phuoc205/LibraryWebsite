@@ -579,7 +579,7 @@ BEGIN
         RAISERROR(N'Lỗi: Tựa đề sách không được để trống khi cập nhật.', 16, 1);
         RETURN;
     END
-    IF @Year > (YEAR(GETDATE()) + 1)
+    IF ( @Year < 0 OR @Year > YEAR ( GETDATE () ) )
     BEGIN
         RAISERROR(N'Lỗi: Năm xuất bản (%d) không hợp lệ.', 16, 1, @Year);
         RETURN;
@@ -972,7 +972,7 @@ GO
 
 -- sp_RemoveFromCart: Xóa sách khỏi giỏ hàng
 CREATE OR ALTER PROCEDURE sp_RemoveFromCart
-    @UserID CHAR(8),
+     @UserID CHAR(8),
     @BookID VARCHAR(10)
 AS
 BEGIN
