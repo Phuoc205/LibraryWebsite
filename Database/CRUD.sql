@@ -135,10 +135,10 @@ CREATE TABLE Cart (
 
 CREATE TABLE [Cart Contain] (
     CartID VARCHAR(8) NOT NULL,
-    BookID VARCHAR(10) NOT NULL,
-    PRIMARY KEY (CartID, BookID),
+    RecordID VARCHAR(10) NOT NULL, 
+    PRIMARY KEY (CartID, RecordID), 
     FOREIGN KEY (CartID) REFERENCES Cart(CartID),
-    FOREIGN KEY (BookID) REFERENCES [Book Copy](BookID)
+    FOREIGN KEY (RecordID) REFERENCES BibliographicRecord(RecordID)
 );
 
 CREATE TABLE Loan (
@@ -366,6 +366,11 @@ INSERT INTO Fine (FineID, Amount, Reason, [Status], HandlerID, LoanID, [Closing 
 ('F005', 200000.00, N'Mất sách', 'Unpaid', 'U0000003', 'L002', NULL, NULL);
 GO
 
+
+INSERT INTO [Cart Contain] (CartID, RecordID) VALUES
+('CT001', 'R002'), ('CT001', 'R004'), ('CT002', 'R005'), ('CT003', 'R008'), ('CT005', 'R009');
+
+GO
 -- =============================================
 -- 3. TAO CAC TRIGGER
 -- =============================================
@@ -394,26 +399,7 @@ BEGIN
 END;
 GO
 
--- trigger_checkcartitemavailable
-CREATE TRIGGER trg_CheckCartItemAvailable
-ON [Cart Contain]
-AFTER INSERT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    IF EXISTS (
-        SELECT 1
-        FROM inserted AS i
-        JOIN [Book Copy] AS bc ON i.BookID = bc.BookID
-        WHERE bc.[Status] <> 'Available'
-    )
-    BEGIN
-        RAISERROR (N'Sách này hiện không có sẵn để thêm vào giỏ. (Đã có người mượn hoặc đang bảo trì)', 16, 1);
-        ROLLBACK TRANSACTION;
-        RETURN;
-    END
-END;
-GO
+
 
 -- trigger_preventmanualstatuschange
 CREATE TRIGGER trg_PreventManualStatusChange
@@ -885,245 +871,9 @@ BEGIN
 END
 GO
 
---- sp_GetActiveCartDetails: Lấy chi tiết sách trong giỏ hàng đang Active
-CREATE OR ALTER PROCEDURE sp_GetActiveCartDetails
-    @UserID CHAR(8)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    DECLARE @ActiveCartID VARCHAR(8);
-    SELECT @ActiveCartID = CartID 
-    FROM Cart 
-    WHERE UserID = @UserID AND [Status] = 'Active';
-
-    IF @ActiveCartID IS NULL
-    BEGIN
-        SELECT N'Không tìm thấy giỏ hàng hoạt động.' AS Message, NULL AS CartID, 0 AS BookCount;
-        RETURN;
-    END
-
-    SELECT
-        cc.CartID,
-        bc.BookID,
-        br.Title,
-        b.[Branch Name] AS BranchName,
-        bc.[Status] AS BookStatus,
-        (
-            SELECT STRING_AGG(a.Fullname, N', ')
-            FROM Viet v 
-            JOIN Author a ON v.AuthorID = a.SSN
-            WHERE v.RecordID = bc.RecordID
-        ) AS AuthorName
-    FROM [Cart Contain] cc
-    JOIN [Book Copy] bc ON cc.BookID = bc.BookID
-    JOIN BibliographicRecord br ON bc.RecordID = br.RecordID
-    JOIN Branch b ON bc.[Branch ID] = b.[Branch ID]
-    WHERE cc.CartID = @ActiveCartID;
-END;
-GO
-
--- sp_AddToCart: Thêm sách vào giỏ hàng
-CREATE OR ALTER PROCEDURE sp_AddToCart
-    @UserID CHAR(8),
-    @BookID VARCHAR(10)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @ActiveCartID VARCHAR(8);
-
-    SELECT @ActiveCartID = CartID 
-    FROM Cart 
-    WHERE UserID = @UserID AND [Status] = 'Active';
-
-    IF @ActiveCartID IS NULL
-    BEGIN
-        DECLARE @MaxNum INT;
-        SELECT @MaxNum = ISNULL(MAX(TRY_CAST(SUBSTRING(CartID, 3, LEN(CartID) - 2) AS INT)), 0)
-        FROM Cart;
-        SET @ActiveCartID = 'CT' + RIGHT('00' + CAST(@MaxNum + 1 AS VARCHAR(3)), 3);
-
-        INSERT INTO Cart (CartID, InitialDate, [Status], UserID)
-        VALUES (@ActiveCartID, GETDATE(), 'Active', @UserID);
-    END
-    
-    IF EXISTS (SELECT 1 FROM [Cart Contain] WHERE CartID = @ActiveCartID AND BookID = @BookID)
-    BEGIN
-        RAISERROR(N'Sách này đã có trong giỏ hàng.', 16, 1);
-        RETURN;
-    END
-
-    BEGIN TRY
-        -- Trigger trg_CheckCartItemAvailable sẽ kiểm tra sách có Available không
-        INSERT INTO [Cart Contain] (CartID, BookID)
-        VALUES (@ActiveCartID, @BookID);
-
-        PRINT N'Thêm sách vào giỏ hàng thành công.';
-    END TRY
-    BEGIN CATCH
-        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
-        RAISERROR(@ErrorMessage, 16, 1);
-        RETURN;
-    END CATCH
-END;
-GO
-
--- sp_RemoveFromCart: Xóa sách khỏi giỏ hàng
-CREATE OR ALTER PROCEDURE sp_RemoveFromCart
-     @UserID CHAR(8),
-    @BookID VARCHAR(10)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @ActiveCartID VARCHAR(8);
-
-    SELECT @ActiveCartID = CartID 
-    FROM Cart 
-    WHERE UserID = @UserID AND [Status] = 'Active';
-
-    IF @ActiveCartID IS NULL
-    BEGIN
-        RAISERROR(N'Không tìm thấy giỏ hàng hoạt động.', 16, 1);
-        RETURN;
-    END
-
-    DELETE FROM [Cart Contain]
-    WHERE CartID = @ActiveCartID AND BookID = @BookID;
-
-    IF @@ROWCOUNT = 0
-    BEGIN
-        RAISERROR(N'Không tìm thấy sách trong giỏ hàng.', 16, 1);
-    END
-    ELSE
-    BEGIN
-        PRINT N'Xóa sách khỏi giỏ hàng thành công.';
-    END
-END;
-GO
-
--- sp_CheckoutCart: Chuyển giỏ hàng thành Phiếu Mượn (Loan)
-CREATE OR ALTER PROCEDURE sp_CheckoutCart
-    @BorrowerID CHAR(8),
-    @HandlerID CHAR(8)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    DECLARE @ActiveCartID VARCHAR(8);
-    DECLARE @FailTitles NVARCHAR(MAX) = ''; 
-    DECLARE @UnavailableCount INT = 0;
-
-    -- 1. Xác định Giỏ hàng Active
-    SELECT @ActiveCartID = CartID 
-    FROM Cart 
-    WHERE UserID = @BorrowerID AND [Status] = 'Active';
-
-    IF @ActiveCartID IS NULL
-    BEGIN
-        RAISERROR(N'Lỗi: Người dùng không có giỏ hàng hoạt động.', 16, 1);
-        RETURN;
-    END
-
-    -- 2. BƯỚC KIỂM TRA TRƯỚC (Pre-check)
-    -- Tìm tất cả các sách trong giỏ mà trạng thái thực tế KHÔNG phải là 'Available'
-    SELECT @FailTitles = @FailTitles + N'- ' + br.Title + ' (' + bc.BookID + N')' + CHAR(13),
-           @UnavailableCount = @UnavailableCount + 1
-    FROM [Cart Contain] cc
-    JOIN [Book Copy] bc ON cc.BookID = bc.BookID
-    JOIN BibliographicRecord br ON bc.RecordID = br.RecordID
-    WHERE cc.CartID = @ActiveCartID 
-      AND bc.[Status] <> 'Available'; -- Sách đã bị mượn, mất, hoặc bảo trì
-
-    -- 3. XỬ LÝ NẾU CÓ SÁCH KHÔNG HỢP LỆ
-    IF @UnavailableCount > 0
-    BEGIN
-        -- Chỉ xóa những cuốn sách không hợp lệ khỏi giỏ hàng
-        DELETE cc
-        FROM [Cart Contain] cc
-        JOIN [Book Copy] bc ON cc.BookID = bc.BookID
-        WHERE cc.CartID = @ActiveCartID 
-          AND bc.[Status] <> 'Available';
-
-        -- Trả về thông báo cảnh báo và KHÔNG tạo phiếu mượn nào
-        SELECT N'Rất tiếc, có ' + CAST(@UnavailableCount AS NVARCHAR) + N' cuốn sách vừa bị người khác mượn trước:' + CHAR(13) + 
-               @FailTitles + CHAR(13) +
-               N'Hệ thống đã xóa các cuốn này khỏi giỏ. Vui lòng kiểm tra và bấm "Xác nhận mượn" lại cho các cuốn còn lại.' AS Message, 
-               'warning' AS Status;
-        
-        RETURN; -- Dừng chương trình tại đây
-    END
-
-    -- 4. NẾU TẤT CẢ ĐỀU HỢP LỆ -> TIẾN HÀNH TẠO PHIẾU MƯỢN (Transaction)
-    BEGIN TRANSACTION;
-    BEGIN TRY
-        DECLARE @MaxLoanNum INT;
-        DECLARE @NextLoanID VARCHAR(8);
-
-        SELECT @MaxLoanNum = ISNULL(MAX(TRY_CAST(SUBSTRING(LoanID, 2, LEN(LoanID) - 1) AS INT)), 0) FROM Loan;
-
-        -- Duyệt qua giỏ hàng để tạo Loan
-        DECLARE cur_CartItems CURSOR FOR
-        SELECT BookID FROM [Cart Contain] WHERE CartID = @ActiveCartID;
-
-        OPEN cur_CartItems;
-        DECLARE @CurrentBookID VARCHAR(10);
-        
-        FETCH NEXT FROM cur_CartItems INTO @CurrentBookID;
-
-        WHILE @@FETCH_STATUS = 0
-        BEGIN
-            SET @MaxLoanNum = @MaxLoanNum + 1;
-            SET @NextLoanID = 'L' + RIGHT('00' + CAST(@MaxLoanNum AS VARCHAR(5)), 3);
-
-            INSERT INTO Loan (LoanID, LoanDate, [Due Date], [Status], [Handler ID], BorrowerID, BookID)
-            VALUES (@NextLoanID, GETDATE(), DATEADD(DAY, 14, GETDATE()), 'OnLoan', @HandlerID, @BorrowerID, @CurrentBookID);
-            
-            FETCH NEXT FROM cur_CartItems INTO @CurrentBookID;
-        END
-
-        CLOSE cur_CartItems;
-        DEALLOCATE cur_CartItems;
-        
-        -- Cập nhật giỏ hàng thành hoàn tất
-        UPDATE Cart SET [Status] = 'Completed' WHERE CartID = @ActiveCartID;
-        
-        COMMIT TRANSACTION;
-
-        SELECT N'Thanh toán thành công! Đã tạo phiếu mượn cho tất cả sách.' AS Message, 'success' AS Status;
-
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        IF CURSOR_STATUS('global','cur_CartItems') >= -1 BEGIN CLOSE cur_CartItems; DEALLOCATE cur_CartItems; END
-        
-        DECLARE @Err NVARCHAR(4000) = ERROR_MESSAGE();
-        RAISERROR(N'Lỗi hệ thống: %s', 16, 1, @Err);
-    END CATCH
-END;
-GO
-
-
-
-
-IF OBJECT_ID('[Cart Contain]', 'U') IS NOT NULL
-    DROP TABLE [Cart Contain];
-GO
-
-CREATE TABLE [Cart Contain] (
-    CartID VARCHAR(8) NOT NULL,
-    RecordID VARCHAR(10) NOT NULL, 
-    PRIMARY KEY (CartID, RecordID), 
-    FOREIGN KEY (CartID) REFERENCES Cart(CartID),
-    FOREIGN KEY (RecordID) REFERENCES BibliographicRecord(RecordID)
-);
-GO
-
-INSERT INTO [Cart Contain] (CartID, RecordID) VALUES
-('CT001', 'R002'), ('CT001', 'R004'), ('CT002', 'R005'), ('CT003', 'R008'), ('CT005', 'R009');
 
 -- =========================================================
 -- 2. CẬP NHẬT STORED PROCEDURES
--- =========================================================
 
 -- 2.1 SP THÊM VÀO GIỎ (POOL MODEL)
 -- Logic: Chỉ cần checking đầu sách, không cần chọn bản sao cụ thể
@@ -1132,6 +882,23 @@ CREATE OR ALTER PROCEDURE sp_AddToCart
     @RecordID VARCHAR(10)
 AS
 BEGIN
+DECLARE @CurrentLoanCount INT;
+    
+    SELECT 
+        @CurrentLoanCount = COUNT(T.RecordID)
+    FROM 
+        [Cart Contain] T -- Giả định đây là bảng lưu các sách đang trong giỏ
+    INNER JOIN 
+        Cart C ON T.CartID = C.CartID
+    WHERE 
+        C.UserID = @UserID;
+    
+    IF @CurrentLoanCount >= 3
+    BEGIN
+        -- Báo lỗi nếu đã đạt hoặc vượt quá giới hạn
+        RAISERROR(N'Bạn chỉ được phép mượn tối đa 3 cuốn sách cho một lần giao dịch/mượn.', 16, 1);
+        RETURN;
+    END
     SET NOCOUNT ON;
     DECLARE @ActiveCartID VARCHAR(8);
 
