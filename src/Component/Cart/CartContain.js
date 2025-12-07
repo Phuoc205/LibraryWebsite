@@ -69,7 +69,10 @@ const CartContain = () => {
         setMessage(data.message);
         setCartItems([]);
       } else {
-        setCartItems(data.books || []);
+        const validItems = (data.books || []).filter(
+          (item) => item && item.CartID
+        );
+        setCartItems(validItems);
       }
     } catch (err) {
       setMessage("Lỗi kết nối hoặc server.");
@@ -83,19 +86,24 @@ const CartContain = () => {
     fetchCart();
   }, []);
 
-  const handleRemove = async (bookID) => {
-    if (!window.confirm(`Xóa sách có mã ${bookID} khỏi giỏ hàng?`)) return;
+  const handleRemove = async (recordID, title) => {
+    if (
+      !window.confirm(
+        `Bạn có chắc muốn xóa cuốn sách "${title}" khỏi giỏ hàng không?`
+      )
+    )
+      return;
 
     try {
       const response = await fetch("http://localhost:5000/api/cart/remove", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userID: USER_ID, bookID }),
+        body: JSON.stringify({ userID: USER_ID, recordID: recordID }),
       });
 
       if (!response.ok) throw new Error("Lỗi xóa sách.");
 
-      alert(`Đã xóa sách ${bookID} khỏi giỏ hàng.`);
+      alert(`Đã xóa sách "${title}" khỏi giỏ hàng.`);
       fetchCart();
     } catch (err) {
       alert(err.message);
@@ -109,8 +117,7 @@ const CartContain = () => {
       return;
     }
 
-    if (!window.confirm(`Xác nhận thanh toán ${cartItems.length} cuốn sách?`))
-      return;
+    if (!window.confirm(`Xác nhận mượn ${cartItems.length} cuốn sách?`)) return;
 
     try {
       const response = await fetch("http://localhost:5000/api/cart/checkout", {
@@ -157,25 +164,17 @@ const CartContain = () => {
               {cartItems.map((item, index) => (
                 <div key={index} style={cartStyles.item}>
                   <div style={cartStyles.itemDetails}>
-                    <div style={cartStyles.itemTitle}>
-                      {item.Title}
-                      <span style={cartStyles.bookID}>
-                        {" "}
-                        - Mã bản sao: {item.BookID}
-                      </span>
-                    </div>
+                    <div style={cartStyles.itemTitle}>{item.Title}</div>
                     <div style={cartStyles.itemMeta}>
-                      Tác giả: {item.AuthorName || "---"} | CN:{" "}
+                      Tác giả: {item.AuthorName || "---"}
                       {item.BranchName}
                     </div>
                     <div style={cartStyles.itemMeta}>
-                      <span style={cartStyles.statusBadge}>
-                        Trạng thái: {item.BookStatus}
-                      </span>
+                      Số bản có sẵn: {item.CopiesAvailable}
                     </div>
                   </div>
                   <button
-                    onClick={() => handleRemove(item.BookID)}
+                    onClick={() => handleRemove(item.RecordID, item.Title)}
                     style={cartStyles.removeButton}
                     title="Xóa khỏi giỏ"
                   >

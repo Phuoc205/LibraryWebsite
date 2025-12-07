@@ -6,6 +6,18 @@ const app = express();
 const PORT = 5000;
 
 // 1. Cấu hình kết nối SQL Server
+// const dbConfig = {
+//   user: "sa",
+//   password: "123456",
+//   server: "localhost", // SỬA: Phải là localhost hoặc 127.0.0.1
+//   //    port: 63218,         // THÊM: Điền port từ ảnh TCP/IP Properties vào đây
+//   database: "LibraryDB",
+//   options: {
+//     encrypt: true,
+//     trustServerCertificate: true,
+//     instanceName: "SQLEXPRESS", // Bạn có thể bỏ dòng này vì đã khai báo port cụ thể
+//   },
+// };
 const dbConfig = {
   user: "sa",
   password: "12345",
@@ -111,29 +123,32 @@ app.post("/api/books", async (req, res) => {
 
 // API 3: Kiểm tra tiền phạt (Gọi Function SQL)
 app.get("/api/loans/fine/:loanID", async (req, res) => {
-    try {
-        const { loanID } = req.params;
-        const pool = await sql.connect(dbConfig);
+  try {
+    const { loanID } = req.params;
+    const pool = await sql.connect(dbConfig);
 
-        // BƯỚC 1: Kiểm tra xem LoanID có tồn tại và lấy trạng thái Loan
-        const loanCheckQuery = `
+    // BƯỚC 1: Kiểm tra xem LoanID có tồn tại và lấy trạng thái Loan
+    const loanCheckQuery = `
             SELECT LoanID, [Due Date], ReturnDate, [Status] 
             FROM Loan 
             WHERE LoanID = @LoanID
         `;
-        const checkResult = await pool.request()
-            .input("LoanID", sql.VarChar, loanID)
-            .query(loanCheckQuery);
-        
-        if (checkResult.recordset.length === 0) {
-            return res.status(404).send("Lỗi: Không tìm thấy LoanID này trong hệ thống.");
-        }
+    const checkResult = await pool
+      .request()
+      .input("LoanID", sql.VarChar, loanID)
+      .query(loanCheckQuery);
 
-        const loanRecord = checkResult.recordset[0];
-        
-        // BƯỚC 2: Nếu đã trả sách, trả về lịch sử giao dịch
-        if (loanRecord.ReturnDate !== null) {
-            const fineHistoryQuery = `
+    if (checkResult.recordset.length === 0) {
+      return res
+        .status(404)
+        .send("Lỗi: Không tìm thấy LoanID này trong hệ thống.");
+    }
+
+    const loanRecord = checkResult.recordset[0];
+
+    // BƯỚC 2: Nếu đã trả sách, trả về lịch sử giao dịch
+    if (loanRecord.ReturnDate !== null) {
+      const fineHistoryQuery = `
                 SELECT 
                     f.FineID, 
                     f.Amount, 
@@ -144,36 +159,46 @@ app.get("/api/loans/fine/:loanID", async (req, res) => {
                 JOIN Loan l ON f.LoanID = l.LoanID
                 WHERE f.LoanID = @LoanID;
             `;
-            const fineHistoryResult = await pool.request()
-                .input("LoanID", sql.VarChar, loanID)
-                .query(fineHistoryQuery);
+      const fineHistoryResult = await pool
+        .request()
+        .input("LoanID", sql.VarChar, loanID)
+        .query(fineHistoryQuery);
 
-            return res.json({ 
-                FineAmount: 0, // Đã trả, tiền phạt luôn là 0 (hoặc đã paid)
-                DaysLate: loanRecord.ReturnDate > loanRecord["Due Date"] 
-                            ? Math.max(0, new Date(loanRecord.ReturnDate).getTime() - new Date(loanRecord["Due Date"]).getTime()) / (1000 * 3600 * 24) 
-                            : 0,
-                // Trả về thông tin giao dịch
-                isReturned: true,
-                ReturnDate: loanRecord.ReturnDate,
-                FineHistory: fineHistoryResult.recordset[0] || { Status: 'No Fine', Amount: 0 } // Đảm bảo trả về dữ liệu
-            });
-        }
-        
-        // BƯỚC 3: Nếu chưa trả, tính toán tiền phạt như bình thường
-        const fineResult = await pool.request().input("LoanID", sql.VarChar, loanID)
-            .query(`
+      return res.json({
+        FineAmount: 0, // Đã trả, tiền phạt luôn là 0 (hoặc đã paid)
+        DaysLate:
+          loanRecord.ReturnDate > loanRecord["Due Date"]
+            ? Math.max(
+                0,
+                new Date(loanRecord.ReturnDate).getTime() -
+                  new Date(loanRecord["Due Date"]).getTime()
+              ) /
+              (1000 * 3600 * 24)
+            : 0,
+        // Trả về thông tin giao dịch
+        isReturned: true,
+        ReturnDate: loanRecord.ReturnDate,
+        FineHistory: fineHistoryResult.recordset[0] || {
+          Status: "No Fine",
+          Amount: 0,
+        }, // Đảm bảo trả về dữ liệu
+      });
+    }
+
+    // BƯỚC 3: Nếu chưa trả, tính toán tiền phạt như bình thường
+    const fineResult = await pool.request().input("LoanID", sql.VarChar, loanID)
+      .query(`
                 SELECT dbo.fn_CalculateFine(@LoanID) AS FineAmount,
                 DATEDIFF(DAY, (SELECT [Due Date] FROM Loan WHERE LoanID = @LoanID), GETDATE()) AS DaysLate
             `);
 
-        res.json({
-            ...fineResult.recordset[0],
-            isReturned: false // Đánh dấu chưa trả
-        });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
+    res.json({
+      ...fineResult.recordset[0],
+      isReturned: false, // Đánh dấu chưa trả
+    });
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 // ==========================================================
@@ -185,8 +210,8 @@ app.post("/api/loans/return", async (req, res) => {
     const { loanID } = req.body;
     const pool = await sql.connect(dbConfig);
 
-
-    await pool.request()
+    await pool
+      .request()
       .input("LoanID", sql.VarChar, loanID)
       .execute("sp_ReturnBookAndPayFine");
 
@@ -198,12 +223,11 @@ app.post("/api/loans/return", async (req, res) => {
 });
 // ==========================================================
 
-
 // API: Sửa thông tin sách
 app.put("/api/books/:id", async (req, res) => {
   try {
-    const { id } = req.params; 
-    const { title, publisher, year, refBookID } = req.body; 
+    const { id } = req.params;
+    const { title, publisher, year, refBookID } = req.body;
 
     const pool = await sql.connect(dbConfig);
 
@@ -273,10 +297,19 @@ app.get("/api/categories", async (req, res) => {
 app.post("/api/insert/books", async (req, res) => {
   console.log("Incoming request body:", req.body); // log luôn
   try {
-    const { title, refBookID, publisher, year, authorName, authorID, authorBio } = req.body;
+    const {
+      title,
+      refBookID,
+      publisher,
+      year,
+      authorName,
+      authorID,
+      authorBio,
+    } = req.body;
 
     const pool = await sql.connect(dbConfig);
-    const result = await pool.request()
+    const result = await pool
+      .request()
       .input("Title", sql.NVarChar(200), title)
       .input("RefBookID", sql.VarChar(10), refBookID || null)
       .input("Publisher", sql.NVarChar(100), publisher)
@@ -304,10 +337,12 @@ app.get("/api/cart/:userID", async (req, res) => {
       .request()
       .input("UserID", sql.Char(8), userID)
       .execute("sp_GetActiveCartDetails");
-    
+
     // Xử lý trường hợp không có giỏ hàng (recordset rỗng hoặc chỉ chứa message)
     if (result.recordset.length > 0 && result.recordset[0].Message) {
-        return res.status(200).json({ books: [], message: result.recordset[0].Message });
+      return res
+        .status(200)
+        .json({ books: [], message: result.recordset[0].Message });
     }
 
     res.json({ books: result.recordset });
@@ -319,37 +354,36 @@ app.get("/api/cart/:userID", async (req, res) => {
 // API 8: Thêm sách vào giỏ hàng
 app.post("/api/cart/add", async (req, res) => {
   try {
-    const { userID, bookID } = req.body;
+    // Lưu ý: Bây giờ nhận recordID
+    const { userID, recordID } = req.body;
     const pool = await sql.connect(dbConfig);
-    
+
     await pool
       .request()
       .input("UserID", sql.Char(8), userID)
-      .input("BookID", sql.VarChar(10), bookID)
+      .input("RecordID", sql.VarChar(10), recordID) // Tham số là RecordID
       .execute("sp_AddToCart");
 
-    res.json({ message: "Đã thêm sách vào giỏ hàng." });
+    res.json({ message: "Thêm vào giỏ thành công" });
   } catch (err) {
-    console.error("Lỗi thêm sách vào giỏ:", err.message);
-    res.status(500).send(err.message);
+    res.status(500).json({ error: err.message }); // Trả về lỗi 500 để UI bắt
   }
 });
 
 // API 9: Xóa sách khỏi giỏ hàng
 app.post("/api/cart/remove", async (req, res) => {
   try {
-    const { userID, bookID } = req.body;
+    const { userID, recordID } = req.body; // Nhận recordID
     const pool = await sql.connect(dbConfig);
-    
+
     await pool
       .request()
       .input("UserID", sql.Char(8), userID)
-      .input("BookID", sql.VarChar(10), bookID)
+      .input("RecordID", sql.VarChar(10), recordID)
       .execute("sp_RemoveFromCart");
 
-    res.json({ message: "Đã xóa sách khỏi giỏ hàng." });
+    res.json({ message: "Đã xóa" });
   } catch (err) {
-    console.error("Lỗi xóa sách khỏi giỏ:", err.message);
     res.status(500).send(err.message);
   }
 });
@@ -359,7 +393,7 @@ app.post("/api/cart/checkout", async (req, res) => {
   try {
     const { borrowerID, handlerID } = req.body;
     const pool = await sql.connect(dbConfig);
-    
+
     // GỌI STORED PROCEDURE SP_CHECKOUTCART
     const result = await pool
       .request()
