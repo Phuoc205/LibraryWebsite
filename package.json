@@ -1,10 +1,10 @@
 {
   "name": "db_fe",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "index.jsx",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "start": "npm run client",
     "client": "webpack-dev-server --mode development --open --hot",
     "server": "nodemon server.js",
     "build": "webpack --mode production"

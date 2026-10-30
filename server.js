@@ -10,7 +10,7 @@ const dbConfig = {
   user: "sa",
   password: "12345",
   server: "localhost", // SỬA: Phải là localhost hoặc 127.0.0.1
-  database: "LibraryDB",
+  database: "LibDB",
   port: 1433,
   options: {
     encrypt: true,
