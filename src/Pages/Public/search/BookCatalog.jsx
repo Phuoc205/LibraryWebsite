@@ -235,10 +235,6 @@ function BookCatalog() {
 
           <div className="book-catalog__container book-catalog__hero-inner">
             <div className="book-catalog__hero-content">
-              <div className="book-catalog__eyebrow">
-                <span />
-                KHÔNG GIAN TRI THỨC BK LIBRARY
-              </div>
 
               <h1>
                 Tìm cuốn sách
@@ -328,11 +324,6 @@ function BookCatalog() {
 
         <section className="book-catalog__content">
           <div className="book-catalog__container">
-            <div className="book-catalog__breadcrumb">
-              <Link to="/">Trang chủ</Link>
-              <span>/</span>
-              <span>Tra cứu sách</span>
-            </div>
 
             <div className="book-catalog__section-heading">
               <div>
@@ -555,7 +546,7 @@ function BookCatalog() {
                               <span>Thông tin sách</span>
                               {id ? (
                                 <Link
-                                  to={`/books/${encodeURIComponent(id)}`}
+                                  to={`/book/${encodeURIComponent(id)}`}
                                   aria-label={`Xem thông tin sách ${title}`}
                                 >
                                   ↗

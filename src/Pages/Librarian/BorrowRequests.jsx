@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import Pagination from '../../Component/common/Pagination';
 import './LibrarianPages.css';
 
 const API_URL = 'http://localhost:5000/api';
@@ -81,6 +82,8 @@ export default function BorrowRequests() {
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
     const [statusFilter, setStatusFilter] = useState('PENDING');
+    const [page, setPage] = useState(1);
+    const [pageSize] = useState(10);
 
     const loadRequests = async () => {
         try {
@@ -94,6 +97,7 @@ export default function BorrowRequests() {
                 : data.requests ?? data.items ?? [];
 
             setRequests(items);
+            setPage(1);
         } catch (err) {
             setError(
                 err.message ||
@@ -179,6 +183,19 @@ export default function BorrowRequests() {
         return true;
     });
 
+    const totalPages = Math.ceil(filteredRequests.length / pageSize);
+
+    const currentPage = Math.min(page, Math.max(totalPages, 1));
+
+    const paginatedRequests = filteredRequests.slice(
+        (currentPage - 1) * pageSize,
+        currentPage * pageSize
+    );
+
+    const handlePageChange = (nextPage) => {
+        setPage(nextPage);
+    };
+
     return (
         <div className="librarian-page">
             <div className="page-heading">
@@ -206,7 +223,10 @@ export default function BorrowRequests() {
                 <select
                     id="request-status"
                     value={statusFilter}
-                    onChange={(event) => setStatusFilter(event.target.value)}
+                    onChange={(event) => {
+                        setStatusFilter(event.target.value);
+                        setPage(1);
+                    }}
                 >
                     <option value="PENDING">Chờ xử lý</option>
                     <option value="APPROVED">Đã duyệt</option>
@@ -252,7 +272,7 @@ export default function BorrowRequests() {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredRequests.map((request, index) => {
+                                paginatedRequests.map((request, index) => {
                                     const id =
                                         request.id ??
                                         request.requestId ??
@@ -273,32 +293,50 @@ export default function BorrowRequests() {
                                             </td>
 
                                             <td className="primary-cell">
-                                                {request.user?.fullName ??
+                                                {request.borrowerName ??
+                                                    request.user?.fullName ??
+                                                    request.user?.name ??
                                                     request.reader?.fullName ??
+                                                    request.reader?.name ??
+                                                    request.borrower?.fullName ??
+                                                    request.borrower?.name ??
                                                     request.fullName ??
                                                     request.username ??
                                                     '—'}
                                             </td>
 
                                             <td>
-                                                {request.user?.userCode ??
-                                                    request.reader?.userCode ??
+                                                {request.borrowerCode ??
                                                     request.userCode ??
                                                     request.readerCode ??
+                                                    request.user?.userCode ??
+                                                    request.user?.code ??
+                                                    request.reader?.userCode ??
+                                                    request.reader?.code ??
+                                                    request.borrower?.userCode ??
+                                                    request.borrower?.code ??
                                                     '—'}
                                             </td>
 
                                             <td>
-                                                {request.book?.title ??
-                                                    request.bookTitle ??
+                                                {request.bookTitle ??
+                                                    request.book?.title ??
                                                     request.title ??
                                                     '—'}
                                             </td>
 
                                             <td>
-                                                {request.barcode ??
-                                                    request.bookCopy?.barcode ??
-                                                    '—'}
+                                                {request.barcode || (
+                                                    request.status === 'PENDING' ? (
+                                                        <span className="barcode-pending">
+                                                            Chưa gán bản sao
+                                                        </span>
+                                                    ) : (
+                                                        <span className="barcode-unavailable">
+                                                            Chưa có mã vạch
+                                                        </span>
+                                                    )
+                                                )}
                                             </td>
 
                                             <td>
@@ -365,6 +403,14 @@ export default function BorrowRequests() {
                     </table>
                 </div>
             </div>
+            <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                total={filteredRequests.length}
+                size={pageSize}
+                loading={loading}
+                onPageChange={handlePageChange}
+            />
         </div>
     );
 }

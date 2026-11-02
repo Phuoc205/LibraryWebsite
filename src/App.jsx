@@ -10,9 +10,10 @@ import {
 import { AuthProvider } from './Context/AuthContext';
 
 import Homepage from './Pages/Public/Homepage/hompage';
-import Login from './Component/Auth/Login';
-import Register from './Component/Auth/Register';
-import BookDetail from './Component/Books/BookDetail';
+import Login from './Pages/Auth/Login';
+import Register from './Pages/Auth/Register';
+import BookDetail from './Pages/Public/Book/BookDetail';
+import MyBooks from './Pages/Public/Book/MyBooks';
 import Categories from './Pages/Public/Categories/Categories';
 import About from './Pages/Public/About/About';
 import BookCatalog from './Pages/Public/search/BookCatalog';
@@ -51,6 +52,7 @@ function App() {
                             <Route path="/about" element={<About />} />
                             <Route path="/search" element={<BookCatalog />} />
                             <Route path="/book/:id" element={<BookDetail />} />
+                            <Route path="/my-books" element={<MyBooks />} />
 
                             <Route
                                 path="/admin"
