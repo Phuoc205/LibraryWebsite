@@ -5,6 +5,9 @@ import Footer from '../../../Component/footer/footer';
 import { useAuth } from '../../../Context/AuthContext';
 import { getBorrowRequests, getBorrows } from '../../../Services/borrowService';
 import './MyBooks.css';
+import RenewalRequests from '../../Librarian/RenewalRequests';
+import Fines from '../../Librarian/Fines';
+import { createRenewalRequest, getRenewalRequests } from '../../../Services/circulationService';
 
 const REQUEST_STATUS = {
     PENDING: { label: 'Chờ duyệt', tone: 'pending' },
@@ -70,7 +73,7 @@ function EmptyState({ title, description }) {
 
 export default function MyBooks() {
     const [searchParams, setSearchParams] = useSearchParams();
-    const validTabs = ['current', 'requests', 'history'];
+    const validTabs = ['current', 'requests', 'history', 'renewals', 'fines'];
     const tabFromUrl = searchParams.get('tab');
     const [activeTab, setActiveTab] = useState(
         validTabs.includes(tabFromUrl) ? tabFromUrl : 'current'
@@ -82,6 +85,22 @@ export default function MyBooks() {
     const [error, setError] = useState('');
     const [requestFilter, setRequestFilter] = useState('ALL');
     const [historyFilter, setHistoryFilter] = useState('ALL');
+    const [renewTarget, setRenewTarget] = useState(null);
+    const [renewNote, setRenewNote] = useState('');
+    const [sending, setSending] = useState(false);
+    const [success, setSuccess] = useState('');
+    const [renewals, setRenewals] = useState([]);
+
+    const requestRenewal = async (event) => {
+        event.preventDefault(); setSending(true); setError(''); setSuccess('');
+        try {
+            const result = await createRenewalRequest(renewTarget.id, renewNote);
+            setRenewals(previous => [...previous, { ...result, borrowRecordId: renewTarget.id }]);
+            setRenewTarget(null); setRenewNote(''); setSuccess('Đã gửi yêu cầu gia hạn. Vui lòng chờ thủ thư duyệt.');
+            handleTabChange('renewals');
+        } catch (err) { setError(err.message); }
+        finally { setSending(false); }
+    };
 
     const loadData = useCallback(async () => {
         if (!isAuthenticated) {
@@ -94,12 +113,19 @@ export default function MyBooks() {
         setLoading(true);
         setError('');
         try {
-            const [requestResult, borrowResult] = await Promise.all([
+            const results = await Promise.allSettled([
                 getBorrowRequests({ page: 1, size: 100 }),
                 getBorrows(),
+                getRenewalRequests(),
             ]);
-            setRequests(extractList(requestResult));
-            setBorrows(extractList(borrowResult));
+            const setters = [setRequests, setBorrows, setRenewals];
+            const labels = ['Yêu cầu mượn', 'Lịch sử mượn/trả', 'Yêu cầu gia hạn'];
+            const errors = [];
+            results.forEach((result, index) => {
+                if (result.status === 'fulfilled') setters[index](extractList(result.value));
+                else errors.push(`${labels[index]}: ${result.reason?.message || 'Không thể tải dữ liệu.'}`);
+            });
+            setError(errors.join(' · '));
         } catch (err) {
             setError(err?.message || 'Không thể tải dữ liệu mượn sách. Vui lòng thử lại.');
         } finally {
@@ -227,6 +253,8 @@ export default function MyBooks() {
                 )}
 
                 <div className="mybooks-tabs" role="tablist" aria-label="Danh mục sách">
+                    <button type="button" role="tab" aria-selected={activeTab === 'renewals'} className={activeTab === 'renewals' ? 'is-active' : ''} onClick={() => handleTabChange('renewals')}>Yêu cầu gia hạn</button>
+                    <button type="button" role="tab" aria-selected={activeTab === 'fines'} className={activeTab === 'fines' ? 'is-active' : ''} onClick={() => handleTabChange('fines')}>Khoản phạt</button>
                     <button type="button" role="tab" aria-selected={activeTab === 'current'} className={activeTab === 'current' ? 'is-active' : ''} onClick={() => handleTabChange('current')}>
                         Đang mượn <span>{currentBorrows.length}</span>
                     </button>
@@ -238,6 +266,14 @@ export default function MyBooks() {
                     </button>
                 </div>
 
+                {success && <div className="cm-success" role="status">{success}</div>}
+                {renewTarget && <form className="cm-decision" onSubmit={requestRenewal}>
+                    <h3>Yêu cầu gia hạn: {renewTarget.bookTitle}</h3><p>Sau khi được duyệt, hạn trả sẽ được cộng thêm 7 ngày. Mỗi phiếu được gia hạn tối đa 1 lần.</p>
+                    <label>Lý do / ghi chú<textarea maxLength={500} value={renewNote} onChange={e => setRenewNote(e.target.value)} /></label>
+                    <div className="cm-actions"><button disabled={sending}>Gửi yêu cầu</button><button type="button" disabled={sending} onClick={() => setRenewTarget(null)}>Đóng</button></div>
+                </form>}
+                {activeTab === 'renewals' && <RenewalRequests reader onChange={loadData} />}
+                {activeTab === 'fines' && <Fines reader />}
                 {loading ? (
                     <div className="mybooks-loading"><span className="mybooks-spinner" /><p>Đang tải thông tin mượn sách...</p></div>
                 ) : (
@@ -248,7 +284,7 @@ export default function MyBooks() {
                                 {currentBorrows.length === 0 ? (
                                     <EmptyState title="Bạn chưa có sách đang mượn" description="Những cuốn sách đã được ghi nhận mượn sẽ xuất hiện ở đây." />
                                 ) : (
-                                    <div className="mybooks-table-wrap"><table className="mybooks-table"><thead><tr><th>Tên sách</th><th>Mã bản sao</th><th>Ngày mượn</th><th>Hạn trả</th><th>Vị trí</th><th>Trạng thái</th></tr></thead><tbody>
+                                    <div className="mybooks-table-wrap"><table className="mybooks-table"><thead><tr><th>Tên sách</th><th>Mã bản sao</th><th>Ngày mượn</th><th>Hạn trả</th><th>Vị trí</th><th>Trạng thái</th><th>Gia hạn</th></tr></thead><tbody>
                                         {currentBorrows.map((item, index) => {
                                             const remaining = daysUntil(item.dueDate);
                                             const overdue = String(item.status || '').toUpperCase() === 'OVERDUE' || (remaining !== null && remaining < 0);
@@ -259,6 +295,7 @@ export default function MyBooks() {
                                                 <td><span className={overdue ? 'mybooks-date mybooks-date--late' : remaining !== null && remaining <= 3 ? 'mybooks-date mybooks-date--soon' : 'mybooks-date'}>{formatDate(item.dueDate)}</span></td>
                                                 <td>{item.shelfLocation || '—'}</td>
                                                 <td><StatusBadge status={overdue ? 'OVERDUE' : item.status} /></td>
+                                                <td>{renewals.some(request => request.borrowRecordId === item.id && request.status === 'PENDING') ? <small>Đang chờ duyệt</small> : !overdue && Number(item.renewalCount || 0) < 1 ? <button className="mybooks-button mybooks-button--light" disabled={sending} onClick={() => { setRenewTarget(item); setRenewNote(''); setSuccess(''); }}>Yêu cầu gia hạn</button> : <small>{overdue ? 'Đã quá hạn' : 'Đã hết lượt'}</small>}</td>
                                             </tr>;
                                         })}
                                     </tbody></table></div>

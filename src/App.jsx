@@ -31,6 +31,8 @@ import BookLookup from './Pages/Librarian/BookLookup';
 import ReaderLookup from './Pages/Librarian/ReaderLookup';
 import BorrowingList from './Pages/Librarian/BorrowingList';
 import BorrowRequests from './Pages/Librarian/BorrowRequests';
+import RenewalRequests from './Pages/Librarian/RenewalRequests';
+import Fines from './Pages/Librarian/Fines';
 
 
 import ProtectedRoute from './Component/common/ProtectedRoute';
@@ -68,6 +70,9 @@ function App() {
                                 <Route path="circulation" element={<CirculationManagement />} />
                                 <Route path="users" element={<UserManagement />} />
                                 <Route path="activity-logs" element={<ActivityLogs />} />
+                                <Route path="requests" element={<BorrowRequests />} />
+                                <Route path="renewals" element={<RenewalRequests />} />
+                                <Route path="fines" element={<Fines />} />
                             </Route>
 
                             {/* Route không tồn tại */}
@@ -76,7 +81,7 @@ function App() {
                                 element={<Navigate to="/" replace />}
                             />
 
-                            <Route path="/librarian" element={<LibrarianLayout />}>
+                            <Route path="/librarian" element={<ProtectedRoute allowedRoles={[ROLES.LIBRARIAN, ROLES.ADMIN]}><LibrarianLayout /></ProtectedRoute>}>
                                 <Route index element={<LibrarianDashboard />} />
 
                                 <Route path="borrow" element={<BorrowBook />} />
@@ -86,6 +91,8 @@ function App() {
                                 <Route path="readers" element={<ReaderLookup />} />
                                 <Route path="borrowings" element={<BorrowingList />} />
                                 <Route path="requests" element={<BorrowRequests />} />
+                                <Route path="renewals" element={<RenewalRequests />} />
+                                <Route path="fines" element={<Fines />} />
                             </Route>
                         </Routes>
                     </main>

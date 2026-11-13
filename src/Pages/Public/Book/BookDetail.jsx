@@ -356,7 +356,7 @@ export default function BookDetail() {
                                                                         'Chưa cập nhật'}
                                                                 </td>
                                                                 <td>
-                                                                    {copy.status ===
+                                                                    {copy.status === 'RESERVED' ? 'Đã giữ chỗ' : copy.status ===
                                                                     'AVAILABLE'
                                                                         ? 'Có thể mượn'
                                                                         : copy.status ===
